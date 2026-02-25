@@ -87,20 +87,22 @@ DeepFace przy pierwszym wywołaniu automatycznie:
 
 ---
 
-## Uruchomienie (3 kroki)
+## Uruchomienie (4 kroki)
 
-### Krok 1 – Zainstaluj zależności
+### Krok 0 – Pobierz dataset z Kaggle
 
-```bash
-cd ml
-pip install -r requirements.txt
-```
+Dataset: **Face Recognition Dataset** by Vasuki Patel  
+🔗 **https://www.kaggle.com/datasets/vasukipatel/face-recognition-dataset**
 
-> Pobiera TensorFlow + DeepFace – tylko raz, może chwilę potrwać (~600 MB).
+**Jak pobrać:**
+
+1. Otwórz powyższy link w przeglądarce
+2. Kliknij przycisk **Download** (prawy górny róg strony) → pobiera się plik `archive.zip`
+3. Zapisz go gdziekolwiek (np. `C:\Users\Ty\Downloads\archive.zip`)
+
+> ℹ Kaggle wymaga darmowego konta. Jeśli nie masz – zarejestruj się na https://www.kaggle.com
 
 ---
-
-## Uruchomienie (3 kroki)
 
 ### Krok 1 – Zainstaluj zależności
 

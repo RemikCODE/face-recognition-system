@@ -35,9 +35,13 @@ pip install -r requirements.txt
 
 ---
 
-### Krok 3 – Wrzuć zdjęcia twarzy do `ml/dataset/`
+### Krok 3 – Pobierz dataset i wrzuć zdjęcia do `ml/dataset/`
 
-Masz pobrany `archive.zip`? W środku są **dwa foldery** – użyj tylko właściwego:
+**Dataset:** Face Recognition Dataset by Vasuki Patel  
+🔗 **https://www.kaggle.com/datasets/vasukipatel/face-recognition-dataset**  
+→ Kliknij **Download** na Kaggle → pobierze się plik `archive.zip`
+
+W środku są **dwa foldery** – użyj tylko właściwego:
 
 | Folder w ZIP | Co zawiera | Czy używać? |
 |---|---|---|

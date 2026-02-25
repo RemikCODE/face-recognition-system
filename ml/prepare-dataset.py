@@ -1,6 +1,10 @@
 """
 prepare-dataset.py – kopiuje zdjęcia twarzy z pobranego archiwum do folderu ml/dataset/.
 
+Dataset: Face Recognition Dataset by Vasuki Patel
+Link:    https://www.kaggle.com/datasets/vasukipatel/face-recognition-dataset
+Pobierz: przycisk "Download" na stronie Kaggle → zapisuje się jako archive.zip
+
 Struktura archiwum (po rozpakowaniu):
   archive/
   ├── faces.csv                           ← plik CSV z kolumnami: id, label
