@@ -1,5 +1,7 @@
-# Folder z obrazami referencyjnymi (duże pliki, nie commitujemy)
-dataset/
+# Zawartość folderu dataset (duże pliki ze zdjęciami twarzy – nie commitujemy)
+# Sam folder dataset/ jest w repozytorium (z .gitkeep)
+dataset/*
+!dataset/.gitkeep
 
 # Cache DeepFace (tworzony automatycznie przez DeepFace.find w folderze dataset/)
 *.pkl

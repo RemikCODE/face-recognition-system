@@ -1,6 +1,6 @@
 # Face Recognition System
 
-> **TL;DR** – sklonuj repozytorium, wrzuć zdjęcia do `ml/dataset/`, kliknij dwa razy `start.bat` – gotowe.
+> **TL;DR** – sklonuj repozytorium, wrzuć zdjęcia do `ml/dataset/`, uruchom dwa terminale – gotowe.
 
 ---
 
@@ -44,20 +44,21 @@ ml/
 
 ---
 
-### Krok 4 – Uruchom wszystko jednym kliknięciem ▶
+### Krok 4 – Uruchom serwisy (dwa terminale)
 
+**Terminal 1 – Python ML serwis:**
+```cmd
+cd ml
+python service.py
 ```
-Kliknij dwa razy: start.bat
+
+**Terminal 2 – Backend + strona webowa:**
+```cmd
+cd backend\FaceRecognitionApi
+dotnet run
 ```
 
-Skrypt otworzy **dwa osobne okna terminala**:
-
-| Okno | Co robi | Port |
-|------|---------|------|
-| **ML Serwis – Python** | DeepFace, rozpoznaje twarze | `5001` |
-| **Backend ASP.NET + Web UI** | REST API + strona webowa | `5233` |
-
-Po chwili automatycznie otworzy się przeglądarka na `http://localhost:5233`.
+Otwórz przeglądarkę: `http://localhost:5233`
 
 ---
 
@@ -82,7 +83,7 @@ Otwórz `http://localhost:5233` → wgraj zdjęcie → kliknij **Recognize**.
 ## Pytania i odpowiedzi
 
 **Czy muszę to uruchamiać ręcznie za każdym razem?**  
-Tak – dwa osobne procesy, ale `start.bat` robi to za Ciebie jednym kliknięciem.
+Tak – dwa osobne procesy, dwa terminale. Możesz je zostawić otwarte przez cały czas pracy.
 
 **Dlaczego dwa osobne serwisy?**  
 Python i .NET to dwa różne środowiska uruchomieniowe. Python obsługuje modele AI (DeepFace), .NET obsługuje bazę danych i stronę webową.
@@ -92,13 +93,13 @@ Otwórz plik `backend/FaceRecognitionSystem.slnx` w Visual Studio 2022+ – i kl
 Ale równie dobrze działa `dotnet run` z linii poleceń.
 
 **Czy mogę uruchomić tylko w linii poleceń bez Visual Studio?**  
-Tak, wystarczy `start.bat` – Visual Studio nie jest wymagane.
+Tak – wystarczą dwa okna terminala z komendami powyżej. Visual Studio nie jest wymagane.
 
 ---
 
 ---
 
-## 🖥️ Uruchamianie ręczne (bez start.bat)
+## 🖥️ Uruchamianie ręczne
 
 Potrzebujesz **dwóch otwartych okien terminala** (cmd / PowerShell / Terminal).
 
@@ -245,7 +246,7 @@ ml/
 ├── README.md                 ← pełna dokumentacja ML
 ├── .gitignore                ← wyklucza dataset/ z gita
 │
-└── dataset/                  ← (UTWÓRZ SAM) folder ze zdjęciami twarzy
+└── dataset/                  ← folder ze zdjęciami twarzy (już istnieje, wrzuć tu swoje pliki)
     ├── Robert Downey Jr_87.jpg
     ├── Scarlett Johansson_12.jpg
     └── ...                   ← nazwy plików = kolumna 'label' z CSV
@@ -273,8 +274,9 @@ dotnet workload install maui
 cd ml
 pip install -r requirements.txt
 
-# 2. Umieść zdjęcia twarzy w folderze ml/dataset/
+# 2. Skopiuj zdjęcia twarzy do folderu ml/dataset/
 #    (pliki muszą mieć nazwy jak w CSV, np. "Robert Downey Jr_87.jpg")
+#    Folder dataset/ już istnieje w repozytorium
 
 # 3. Uruchom serwis – nasłuchuje na porcie 5001
 #    Model Facenet512 jest gotowy (wytrenowany) – nie trzeba nic trenować.
