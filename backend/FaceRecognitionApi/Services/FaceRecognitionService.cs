@@ -10,6 +10,7 @@ namespace FaceRecognitionApi.Services;
 /// The ML service is expected to accept a multipart/form-data POST with the image
 /// and return JSON: { "label": "Robert Downey Jr_87.jpg", "confidence": 0.92 }
 /// If the ML service URL is not configured, the service returns a not-configured result.
+/// Every result is persisted to RecognitionLogs for the web results dashboard.
 /// </summary>
 public class FaceRecognitionService : IFaceRecognitionService
 {
@@ -32,18 +33,29 @@ public class FaceRecognitionService : IFaceRecognitionService
 
     public async Task<RecognitionResult> RecognizeAsync(Stream imageStream, string fileName)
     {
+        RecognitionResult result;
         var mlServiceUrl = _config["MlService:Url"];
 
         if (string.IsNullOrWhiteSpace(mlServiceUrl))
         {
             _logger.LogWarning("ML service URL is not configured. Set 'MlService:Url' in appsettings.");
-            return new RecognitionResult
+            result = new RecognitionResult
             {
                 Found = false,
                 Message = "Face recognition ML service is not configured.",
             };
         }
+        else
+        {
+            result = await CallMlServiceAsync(imageStream, fileName, mlServiceUrl);
+        }
 
+        await SaveLogAsync(result, fileName);
+        return result;
+    }
+
+    private async Task<RecognitionResult> CallMlServiceAsync(Stream imageStream, string fileName, string mlServiceUrl)
+    {
         try
         {
             using var content = new MultipartFormDataContent();
@@ -103,6 +115,20 @@ public class FaceRecognitionService : IFaceRecognitionService
                 Message = $"Error communicating with ML service: {ex.Message}",
             };
         }
+    }
+
+    private async Task SaveLogAsync(RecognitionResult result, string sourceFileName)
+    {
+        _db.RecognitionLogs.Add(new RecognitionLog
+        {
+            RecognizedAt = DateTime.UtcNow,
+            Found = result.Found,
+            PersonName = result.Person?.Name ?? string.Empty,
+            Confidence = result.Confidence,
+            Message = result.Message,
+            ImageFileName = sourceFileName,
+        });
+        await _db.SaveChangesAsync();
     }
 
     private static string GetMimeType(string fileName)

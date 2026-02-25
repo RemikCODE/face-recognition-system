@@ -5,6 +5,7 @@ namespace FaceRecognitionApp;
 public partial class MainPage : ContentPage
 {
     private readonly ApiService _apiService;
+    private readonly bool _isDesktop;
 
     private Stream? _photoStream;
     private string _photoFileName = "photo.jpg";
@@ -14,11 +15,17 @@ public partial class MainPage : ContentPage
         InitializeComponent();
         _apiService = apiService;
 
-        // Show the camera button only on mobile platforms
-        TakePhotoButton.IsVisible = DeviceInfo.Idiom != DeviceIdiom.Desktop;
+        // Desktop (Windows/Mac): file picker only.
+        // Mobile (Android/iOS): camera only.
+        _isDesktop = DeviceInfo.Idiom == DeviceIdiom.Desktop;
+        SelectFileButton.IsVisible = _isDesktop;
+        TakePhotoButton.IsVisible = !_isDesktop;
+        InstructionLabel.Text = _isDesktop
+            ? "Select an image file from your computer to identify a person."
+            : "Take a photo with the camera to identify a person.";
     }
 
-    // ── File / photo selection ───────────────────────────────────────────────
+    // ── File picker (desktop only) ───────────────────────────────────────────
 
     private async void OnSelectFileClicked(object sender, EventArgs e)
     {
@@ -29,10 +36,11 @@ public partial class MainPage : ContentPage
                 Title = "Select a face image",
                 FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
                 {
-                    { DevicePlatform.iOS,          new[] { "public.image" } },
-                    { DevicePlatform.Android,      new[] { "image/*" } },
-                    { DevicePlatform.WinUI,        new[] { ".jpg", ".jpeg", ".png", ".bmp" } },
-                    { DevicePlatform.MacCatalyst,  new[] { "public.image" } },
+                    { DevicePlatform.WinUI,       new[] { ".jpg", ".jpeg", ".png", ".bmp" } },
+                    { DevicePlatform.MacCatalyst, new[] { "public.image" } },
+                    // Fallback for other platforms (shouldn't be reached)
+                    { DevicePlatform.iOS,         new[] { "public.image" } },
+                    { DevicePlatform.Android,     new[] { "image/*" } },
                 })
             });
 
@@ -47,6 +55,8 @@ public partial class MainPage : ContentPage
             await DisplayAlert("Error", ex.Message, "OK");
         }
     }
+
+    // ── Camera capture (mobile only) ────────────────────────────────────────
 
     private async void OnTakePhotoClicked(object sender, EventArgs e)
     {
@@ -103,7 +113,6 @@ public partial class MainPage : ContentPage
                 return;
             }
 
-            // Populate result card
             ResultTitleLabel.Text = result.Found ? "✅ Face Recognized" : "❌ Face Not Recognized";
             ResultTitleLabel.TextColor = result.Found ? Color.FromArgb("#2e7d32") : Color.FromArgb("#f57f17");
             ResultNameLabel.Text = result.Person?.Name ?? "—";

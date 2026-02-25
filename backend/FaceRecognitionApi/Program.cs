@@ -25,7 +25,7 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new() { Title = "Face Recognition API", Version = "v1" });
 });
 
-// CORS – allows the PyQt desktop app and web front-end to call the API
+// CORS – allows the MAUI desktop/mobile app and web front-end to call the API
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -49,11 +49,24 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Apply migrations and ensure database is created on startup
+// Apply migrations, ensure database is created, and auto-seed from bundled CSV
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
+
+    // Auto-seed the Persons table from the bundled faces.csv if the table is empty
+    if (!db.Persons.Any())
+    {
+        var csvPath = Path.Combine(AppContext.BaseDirectory, "Data", "faces.csv");
+        if (File.Exists(csvPath))
+        {
+            var csvImport = scope.ServiceProvider.GetRequiredService<CsvImportService>();
+            var count = await csvImport.ImportAsync(csvPath);
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation("Auto-seeded {Count} persons from bundled faces.csv", count);
+        }
+    }
 }
 
 // Configure the HTTP request pipeline.

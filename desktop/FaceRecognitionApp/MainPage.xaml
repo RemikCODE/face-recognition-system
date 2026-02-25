@@ -12,7 +12,9 @@
                    FontSize="22"
                    FontAttributes="Bold"
                    HorizontalTextAlignment="Center" />
-            <Label Text="Select a photo or take one with the camera to identify a person."
+
+            <!-- Platform-specific instruction -->
+            <Label x:Name="InstructionLabel"
                    FontSize="13"
                    TextColor="Gray"
                    HorizontalTextAlignment="Center" />
@@ -29,27 +31,27 @@
                        BackgroundColor="#eeeeee" />
             </Frame>
 
-            <!-- Action buttons row -->
-            <HorizontalStackLayout Spacing="12" HorizontalOptions="Center">
+            <!-- Desktop: select file from disk -->
+            <Button x:Name="SelectFileButton"
+                    Text="📁 Select File"
+                    Clicked="OnSelectFileClicked"
+                    BackgroundColor="#333333"
+                    TextColor="White"
+                    CornerRadius="8"
+                    HeightRequest="44"
+                    IsVisible="False"
+                    HorizontalOptions="Center" />
 
-                <!-- Always visible: pick file from disk / gallery -->
-                <Button Text="📁 Select File"
-                        Clicked="OnSelectFileClicked"
-                        BackgroundColor="#333333"
-                        TextColor="White"
-                        CornerRadius="8"
-                        HeightRequest="44" />
-
-                <!-- Camera: visible only on mobile platforms -->
-                <Button x:Name="TakePhotoButton"
-                        Text="📷 Take Photo"
-                        Clicked="OnTakePhotoClicked"
-                        BackgroundColor="#333333"
-                        TextColor="White"
-                        CornerRadius="8"
-                        HeightRequest="44"
-                        IsVisible="False" />
-            </HorizontalStackLayout>
+            <!-- Mobile: take photo with camera -->
+            <Button x:Name="TakePhotoButton"
+                    Text="📷 Take Photo"
+                    Clicked="OnTakePhotoClicked"
+                    BackgroundColor="#333333"
+                    TextColor="White"
+                    CornerRadius="8"
+                    HeightRequest="44"
+                    IsVisible="False"
+                    HorizontalOptions="Center" />
 
             <!-- Recognize button -->
             <Button x:Name="RecognizeButton"

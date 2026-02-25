@@ -1,0 +1,46 @@
+@model List<FaceRecognitionApi.Models.RecognitionLog>
+@using FaceRecognitionApi.Models
+
+@if (Model.Any())
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Time</th>
+                    <th>Status</th>
+                    <th>Person</th>
+                    <th>Confidence</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var log in Model)
+                {
+                    <tr>
+                        <td class="text-muted small">@log.RecognizedAt.ToString("yyyy-MM-dd HH:mm:ss") UTC</td>
+                        <td>
+                            @if (log.Found)
+                            {
+                                <span class="badge bg-success">✅ Found</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-warning text-dark">❌ Not found</span>
+                            }
+                        </td>
+                        <td class="fw-semibold">@(string.IsNullOrEmpty(log.PersonName) ? "—" : log.PersonName)</td>
+                        <td>@(log.Found ? $"{log.Confidence * 100:F1}%" : "—")</td>
+                        <td class="text-muted small">@log.Message</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <div class="alert alert-info">
+        No recognition results yet. Send a photo from the mobile or desktop app to see results here.
+    </div>
+}

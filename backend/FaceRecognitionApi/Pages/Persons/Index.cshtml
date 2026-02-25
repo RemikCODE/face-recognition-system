@@ -9,32 +9,6 @@
     <span class="badge bg-secondary fs-6">@Model.Total records</span>
 </div>
 
-
-<div class="card mb-4 border-primary">
-    <div class="card-header bg-primary text-white fw-semibold">
-        📂 Załaduj bazę danych z pliku CSV
-    </div>
-    <div class="card-body">
-        <p class="card-text text-muted small mb-2">
-            Wybierz swój plik CSV z dysku i kliknij <strong>Załaduj</strong>.
-            Format CSV: kolumny <code>id</code> i <code>label</code>
-            (np. <code>1,Robert Downey Jr_87.jpg</code>).
-        </p>
-        <form method="post" asp-page-handler="Seed" enctype="multipart/form-data">
-            @Html.AntiForgeryToken()
-            <div class="input-group">
-                <input type="file" class="form-control" name="CsvFile" accept=".csv,.txt" />
-                <button type="submit" class="btn btn-primary">Załaduj</button>
-            </div>
-        </form>
-        @if (!string.IsNullOrEmpty(Model.SeedMessage))
-        {
-            <div class="alert @(Model.SeedSuccess ? "alert-success" : "alert-warning") mt-2 mb-0 py-2">
-                @Model.SeedMessage
-            </div>
-        }
-    </div>
-</div>
 <form method="get" class="mb-4">
     <div class="input-group">
         <input type="text" class="form-control" name="search" value="@Model.Search"
@@ -105,7 +79,7 @@ else
     <div class="alert alert-info">
         @if (string.IsNullOrEmpty(Model.Search))
         {
-            <span>Baza danych jest pusta. Użyj formularza powyżej, żeby załadować dane z pliku CSV.</span>
+            <span>The database is empty. Place a valid <code>faces.csv</code> in the <code>Data/</code> folder and restart the application.</span>
         }
         else
         {
