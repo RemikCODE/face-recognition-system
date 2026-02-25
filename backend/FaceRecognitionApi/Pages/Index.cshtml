@@ -1,0 +1,86 @@
+@page
+@model FaceRecognitionApi.Pages.IndexModel
+@{
+    ViewData["Title"] = "Face Recognition";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-7 col-lg-6">
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-dark text-white">
+                <h4 class="mb-0">🔍 Recognize a Face</h4>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="imageFile" class="form-label fw-semibold">Select face image</label>
+                        <input type="file" class="form-control" id="imageFile" name="imageFile"
+                               accept="image/jpeg,image/png,image/bmp" required />
+                        <div class="form-text">Accepted formats: JPEG, PNG, BMP</div>
+                    </div>
+
+                    <div id="previewWrap" class="mb-3 text-center d-none">
+                        <img id="preview" class="img-fluid rounded border" style="max-height:280px;" alt="preview" />
+                    </div>
+
+                    <button type="submit" class="btn btn-dark w-100">Recognize</button>
+                </form>
+            </div>
+        </div>
+
+        @if (Model.Result != null)
+        {
+            var isFound = Model.Result.Found;
+            var headerClass = isFound ? "bg-success" : "bg-warning";
+            var icon = isFound ? "✅" : "❌";
+            <div class="card shadow-sm">
+                <div class="card-header @headerClass text-white">
+                    <h5 class="mb-0">@icon @(isFound ? "Face Recognized" : "Face Not Recognized")</h5>
+                </div>
+                <div class="card-body">
+                    @if (isFound && Model.Result.Person != null)
+                    {
+                        <dl class="row mb-0">
+                            <dt class="col-5">Name</dt>
+                            <dd class="col-7 fw-bold fs-5">@Model.Result.Person.Name</dd>
+
+                            <dt class="col-5">Confidence</dt>
+                            <dd class="col-7">
+                                <div class="progress" style="height:22px;" title="@((Model.Result.Confidence * 100).ToString("F1"))%">
+                                    <div class="progress-bar bg-success" role="progressbar"
+                                         style="width:@((Model.Result.Confidence * 100).ToString("F0", System.Globalization.CultureInfo.InvariantCulture))%">
+                                        @((Model.Result.Confidence * 100).ToString("F1"))%
+                                    </div>
+                                </div>
+                            </dd>
+
+                            <dt class="col-5">Image file</dt>
+                            <dd class="col-7 text-muted small">@Model.Result.Person.ImageFileName</dd>
+                        </dl>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">@Model.Result.Message</p>
+                    }
+                </div>
+            </div>
+        }
+
+    </div>
+</div>
+
+@section Scripts {
+<script>
+document.getElementById('imageFile').addEventListener('change', function () {
+    const file = this.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        document.getElementById('preview').src = e.target.result;
+        document.getElementById('previewWrap').classList.remove('d-none');
+    };
+    reader.readAsDataURL(file);
+});
+</script>
+}

@@ -14,8 +14,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<CsvImportService>();
 builder.Services.AddHttpClient<IFaceRecognitionService, FaceRecognitionService>();
 
-// Controllers
+// Controllers + Razor Pages (web frontend served from the same host)
 builder.Services.AddControllers();
+builder.Services.AddRazorPages();
 
 // Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();
@@ -63,8 +64,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseCors();
 app.MapControllers();
+app.MapRazorPages();
 
 app.Run();
 
