@@ -7,6 +7,7 @@ Aplikacja do rozpoznawania twarzy zbudowana z trzech warstw:
 | Backend + Web UI | ASP.NET Core 8 (Razor Pages + REST API) | `backend/` |
 | Desktop (Windows) | .NET MAUI 8 | `desktop/` |
 | Mobilna (Android / iOS) | .NET MAUI 8 | `desktop/` (ten sam projekt) |
+| Serwis ML | Python 3, DeepFace (Facenet512), Flask | `ml/` |
 
 ---
 
@@ -112,6 +113,26 @@ desktop/
 
 ---
 
+### 📁 `ml/` – serwis rozpoznawania twarzy (Python)
+
+```
+ml/
+├── requirements.txt          ← zależności Python (pip install -r requirements.txt)
+├── train.py                  ← oblicza embeddingi z datasetu i zapisuje do embeddings.pkl
+├── service.py                ← Flask HTTP serwis na porcie 5001; przyjmuje POST /recognize
+├── README.md                 ← pełna dokumentacja ML
+├── .gitignore                ← wyklucza dataset/ i embeddings.pkl z gita
+│
+├── dataset/                  ← (UTWÓRZ SAM) folder ze zdjęciami twarzy
+│   ├── Robert Downey Jr_87.jpg
+│   ├── Scarlett Johansson_12.jpg
+│   └── ...                   ← nazwy plików = kolumna 'label' z CSV
+│
+└── embeddings.pkl            ← (generowany przez train.py) wektory 512-dim dla każdej twarzy
+```
+
+---
+
 ## Wymagania wstępne
 
 1. **[.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8)** – wymagany do backendu i MAUI
@@ -120,6 +141,29 @@ desktop/
 ```bash
 dotnet workload install maui
 ```
+
+3. **Python 3.10+** – wymagany do serwisu ML (masz już pobranego ✅)
+
+---
+
+## Krok 0 – Uruchom serwis ML (Python)
+
+```bash
+# 1. Zainstaluj zależności (tylko raz)
+cd ml
+pip install -r requirements.txt
+
+# 2. Umieść zdjęcia twarzy w folderze ml/dataset/
+#    (pliki muszą mieć nazwy jak w CSV, np. "Robert Downey Jr_87.jpg")
+
+# 3. Oblicz embeddingi (to może chwilę zająć)
+python train.py
+
+# 4. Uruchom serwis – nasłuchuje na porcie 5001
+python service.py
+```
+
+> Szczegółowa dokumentacja w [`ml/README.md`](ml/README.md)
 
 ---
 
@@ -256,10 +300,12 @@ dotnet test FaceRecognitionSystem.slnx
 
 ```
 Strona webowa  ──┐
-                 │  POST /api/faces/recognize
-Desktop MAUI   ──┼──────────────────────────▶  ASP.NET Backend  ──▶  Python ML service
-                 │                              (SQLite DB)            (port 5001)
-Mobilna MAUI   ──┘
-
-Strona webowa + REST API + baza SQLite żyją w jednym procesie (port 5233)
+                 │  POST /api/faces/recognize      POST /recognize (multipart)
+Desktop MAUI   ──┼──────────────────────────▶  ASP.NET Backend  ──────────────▶  Python ML serwis
+                 │                              (SQLite DB)                       DeepFace Facenet512
+Mobilna MAUI   ──┘                              port 5233                         port 5001
+                                                     │                                │
+                                                     ▼                                ▼
+                                               Razor Pages UI                  embeddings.pkl
+                                               REST API /swagger               (wektory twarzy)
 ```

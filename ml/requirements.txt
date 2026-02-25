@@ -1,0 +1,10 @@
+# Python ML service – face recognition
+# Instalacja: pip install -r requirements.txt
+
+deepface>=0.0.98
+flask>=3.1.0
+flask-cors>=6.0.0
+numpy>=1.24.0
+pillow>=10.0.0
+tf-keras>=2.16.0        # wymagane przez deepface z tensorflow>=2.16
+tensorflow>=2.16.0      # CPU-only – jeśli masz GPU, zainstaluj tensorflow[and-cuda]
