@@ -10,6 +10,108 @@ Aplikacja do rozpoznawania twarzy zbudowana z trzech warstw:
 
 ---
 
+## Cały kod – mapa plików
+
+### 📁 `backend/FaceRecognitionApi/` – serwer + strona webowa
+
+```
+backend/
+├── FaceRecognitionSystem.slnx          ← plik solucji .NET (otwórz w Visual Studio)
+├── data/
+│   └── sample_faces.csv                ← przykładowy plik CSV do załadowania bazy
+│
+└── FaceRecognitionApi/                 ← projekt ASP.NET Core 8
+    ├── Program.cs                      ← punkt wejścia; DI, SQLite, CORS, Swagger, Razor Pages
+    ├── appsettings.json                ← konfiguracja: connection string, URL ML serwisu, CORS
+    ├── appsettings.Development.json    ← konfiguracja deweloperska (ML URL: localhost:5001)
+    │
+    ├── Models/
+    │   ├── Person.cs                   ← encja: Id, Name, ImageFileName
+    │   └── RecognitionResult.cs        ← odpowiedź API: Found, Person, Confidence, Message
+    │
+    ├── Data/
+    │   └── AppDbContext.cs             ← Entity Framework Core; tabela Persons w SQLite
+    │
+    ├── Services/
+    │   ├── IFaceRecognitionService.cs  ← interfejs: RecognizeAsync(stream, fileName)
+    │   ├── FaceRecognitionService.cs   ← implementacja: wysyła zdjęcie do Python ML serwisu
+    │   └── CsvImportService.cs         ← importuje CSV (id,label) do bazy; parsuje nazwę z pliku
+    │
+    ├── Controllers/
+    │   ├── PersonsController.cs        ← REST: GET/POST/DELETE /api/persons, POST /api/persons/seed
+    │   └── FacesController.cs          ← REST: POST /api/faces/recognize (upload zdjęcia)
+    │
+    ├── Pages/                          ← strona webowa (Razor Pages)
+    │   ├── _ViewImports.cshtml         ← globalny import taghelpers i namespace
+    │   ├── _ViewStart.cshtml           ← ustawia _Layout jako domyślny layout
+    │   ├── Shared/
+    │   │   └── _Layout.cshtml          ← wspólny layout Bootstrap 5 (navbar, footer)
+    │   ├── Index.cshtml                ← strona "/": upload zdjęcia + podgląd + wynik
+    │   ├── Index.cshtml.cs             ← PageModel dla Index: OnGet / OnPostAsync
+    │   ├── Persons/
+    │   │   ├── Index.cshtml            ← strona "/Persons": tabela z paginacją i wyszukiwarką
+    │   │   └── Index.cshtml.cs         ← PageModel dla Persons: OnGetAsync(page, search)
+    │
+    └── wwwroot/
+        └── css/site.css                ← własne style CSS (minimalne, dopełnienie Bootstrap)
+```
+
+---
+
+### 📁 `backend/FaceRecognitionApi.Tests/` – testy automatyczne
+
+```
+FaceRecognitionApi.Tests/
+├── FaceRecognitionApi.Tests.csproj     ← projekt testów xUnit
+├── CsvImportServiceTests.cs            ← testy: parsowanie nazw z pliku, import CSV, zastępowanie danych
+├── FaceRecognitionServiceTests.cs      ← testy: odpowiedź gdy ML serwis nie jest skonfigurowany
+└── PersonsApiTests.cs                  ← testy integracyjne: GET /api/persons, seed, recognize
+```
+
+---
+
+### 📁 `desktop/FaceRecognitionApp/` – aplikacja desktop + mobilna (.NET MAUI)
+
+```
+desktop/
+├── FaceRecognitionApp.slnx             ← plik solucji MAUI
+│
+└── FaceRecognitionApp/
+    ├── FaceRecognitionApp.csproj       ← projekt MAUI; 4 platformy: Windows, Android, iOS, macOS
+    ├── MauiProgram.cs                  ← punkt wejścia MAUI; DI: ApiService, strony
+    ├── App.xaml / App.xaml.cs          ← inicjalizacja aplikacji, zasoby (kolory)
+    ├── AppShell.xaml / AppShell.xaml.cs← Shell z zakładkami: "Recognize" i "Settings"
+    │
+    ├── MainPage.xaml                   ← UI: podgląd zdjęcia, przyciski, karta wyników
+    ├── MainPage.xaml.cs                ← logika: FilePicker, MediaPicker, wywołanie ApiService
+    ├── SettingsPage.xaml               ← UI: pole do wpisania URL backendu
+    ├── SettingsPage.xaml.cs            ← logika: zapis URL do Preferences urządzenia
+    │
+    ├── Models/
+    │   ├── Person.cs                   ← model danych osoby
+    │   └── RecognitionResult.cs        ← model odpowiedzi z backendu
+    │
+    ├── Services/
+    │   └── ApiService.cs               ← HTTP klient: POST /api/faces/recognize; URL z Preferences
+    │
+    └── Platforms/                      ← pliki specyficzne dla każdej platformy
+        ├── Android/
+        │   ├── AndroidManifest.xml     ← uprawnienia: INTERNET, CAMERA, READ_MEDIA_IMAGES
+        │   ├── MainActivity.cs         ← punkt wejścia Android
+        │   └── MainApplication.cs      ← inicjalizacja MAUI na Androidzie
+        ├── iOS/
+        │   ├── AppDelegate.cs          ← punkt wejścia iOS
+        │   └── Info.plist              ← NSCameraUsageDescription, NSPhotoLibraryUsageDescription
+        ├── MacCatalyst/
+        │   ├── AppDelegate.cs
+        │   └── Info.plist
+        └── Windows/
+            ├── App.xaml / App.xaml.cs  ← punkt wejścia Windows
+            └── Package.appxmanifest    ← manifest aplikacji Windows (MSIX)
+```
+
+---
+
 ## Wymagania wstępne
 
 1. **[.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8)** – wymagany do backendu i MAUI
