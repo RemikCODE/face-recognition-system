@@ -9,6 +9,36 @@
     <span class="badge bg-secondary fs-6">@Model.Total records</span>
 </div>
 
+
+<div class="card mb-4 border-primary">
+    <div class="card-header bg-primary text-white fw-semibold">
+        📂 Załaduj bazę danych z pliku CSV
+    </div>
+    <div class="card-body">
+        <p class="card-text text-muted small mb-2">
+            Podaj pełną ścieżkę do pliku CSV na serwerze (np.
+            <code>C:\Users\Ty\faces.csv</code> lub
+            <code>/home/user/faces.csv</code>).
+            Format CSV: kolumny <code>id</code> i <code>label</code>
+            (np. <code>1,Robert Downey Jr_87.jpg</code>).
+        </p>
+        <form method="post" asp-page-handler="Seed">
+            @Html.AntiForgeryToken()
+            <div class="input-group">
+                <input type="text" class="form-control" name="CsvFilePath"
+                       value="@Model.CsvFilePath"
+                       placeholder="C:\ścieżka\do\faces.csv" />
+                <button type="submit" class="btn btn-primary">Załaduj</button>
+            </div>
+        </form>
+        @if (!string.IsNullOrEmpty(Model.SeedMessage))
+        {
+            <div class="alert @(Model.SeedSuccess ? "alert-success" : "alert-warning") mt-2 mb-0 py-2">
+                @Model.SeedMessage
+            </div>
+        }
+    </div>
+</div>
 <form method="get" class="mb-4">
     <div class="input-group">
         <input type="text" class="form-control" name="search" value="@Model.Search"
@@ -79,7 +109,7 @@ else
     <div class="alert alert-info">
         @if (string.IsNullOrEmpty(Model.Search))
         {
-            <span>No persons in the database yet. Use <a href="/swagger" class="alert-link">the API</a> to seed data from a CSV file.</span>
+            <span>Baza danych jest pusta. Użyj formularza powyżej, żeby załadować dane z pliku CSV.</span>
         }
         else
         {

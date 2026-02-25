@@ -96,6 +96,43 @@ Tak, wystarczy `start.bat` – Visual Studio nie jest wymagane.
 
 ---
 
+---
+
+## 🖥️ Uruchamianie ręczne (bez start.bat)
+
+Potrzebujesz **dwóch otwartych okien terminala** (cmd / PowerShell / Terminal).
+
+### Okno 1 – Python ML serwis
+
+```cmd
+cd ml
+python service.py
+```
+
+Zostaw to okno otwarte. Serwis działa na porcie `5001`.
+
+### Okno 2 – Backend + strona webowa
+
+```cmd
+cd backend\FaceRecognitionApi
+dotnet run
+```
+
+Zostaw to okno otwarte. Po uruchomieniu otwórz przeglądarkę:  
+→ `http://localhost:5233`
+
+### Załaduj CSV (raz, po pierwszym starcie)
+
+1. Otwórz `http://localhost:5233/Persons` w przeglądarce
+2. W polu **"Załaduj bazę danych z pliku CSV"** wpisz pełną ścieżkę do swojego pliku CSV, np.:
+   - Windows: `C:\Users\Ty\Desktop\faces.csv`
+   - Względna (jeśli plik jest w repozytorium): wpisz pełną ścieżkę
+3. Kliknij **Załaduj** – baza zostanie wypełniona automatycznie
+
+> Przykładowy plik CSV z 8 rekordami: `backend/data/sample_faces.csv`
+
+---
+
 ## Cały kod – mapa plików
 
 ### 📁 `backend/FaceRecognitionApi/` – serwer + strona webowa
