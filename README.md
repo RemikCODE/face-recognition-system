@@ -1,13 +1,98 @@
 # Face Recognition System
 
-Aplikacja do rozpoznawania twarzy zbudowana z trzech warstw:
+> **TL;DR** – sklonuj repozytorium, wrzuć zdjęcia do `ml/dataset/`, kliknij dwa razy `start.bat` – gotowe.
 
-| Warstwa | Technologia | Folder |
-|---------|-------------|--------|
-| Backend + Web UI | ASP.NET Core 8 (Razor Pages + REST API) | `backend/` |
-| Desktop (Windows) | .NET MAUI 8 | `desktop/` |
-| Mobilna (Android / iOS) | .NET MAUI 8 | `desktop/` (ten sam projekt) |
-| Serwis ML | Python 3, DeepFace (Facenet512), Flask | `ml/` |
+---
+
+## ⚡ SZYBKI START (Windows)
+
+### Krok 1 – Sklonuj repozytorium (tylko raz)
+
+```bash
+git clone https://github.com/RemikCODE/face-recognition-system.git
+cd face-recognition-system
+```
+
+Albo pobierz jako ZIP z GitHub → **Code → Download ZIP** → rozpakuj.
+
+---
+
+### Krok 2 – Zainstaluj wymagania (tylko raz)
+
+**Python ML serwis:**
+```bash
+cd ml
+pip install -r requirements.txt
+```
+
+**.NET backend** – pobierz i zainstaluj [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8) (jeśli jeszcze nie masz).
+
+---
+
+### Krok 3 – Wrzuć zdjęcia twarzy
+
+Utwórz folder `ml\dataset\` i skopiuj do niego zdjęcia ze swojego datasetu.  
+Nazwy plików muszą być dokładnie takie jak w CSV (np. `Robert Downey Jr_87.jpg`).
+
+```
+ml/
+└── dataset/
+    ├── Robert Downey Jr_87.jpg
+    ├── Scarlett Johansson_12.jpg
+    └── ...
+```
+
+---
+
+### Krok 4 – Uruchom wszystko jednym kliknięciem ▶
+
+```
+Kliknij dwa razy: start.bat
+```
+
+Skrypt otworzy **dwa osobne okna terminala**:
+
+| Okno | Co robi | Port |
+|------|---------|------|
+| **ML Serwis – Python** | DeepFace, rozpoznaje twarze | `5001` |
+| **Backend ASP.NET + Web UI** | REST API + strona webowa | `5233` |
+
+Po chwili automatycznie otworzy się przeglądarka na `http://localhost:5233`.
+
+---
+
+### Krok 5 – Załaduj bazę danych z CSV
+
+Otwórz `http://localhost:5233/swagger` → `POST /api/persons/seed` → **Try it out** → wklej:
+
+```json
+{ "csvFilePath": "C:\\ścieżka\\do\\faces.csv" }
+```
+
+> Przykładowy plik CSV: `backend/data/sample_faces.csv`
+
+---
+
+### Krok 6 – Rozpoznaj twarz
+
+Otwórz `http://localhost:5233` → wgraj zdjęcie → kliknij **Recognize**.
+
+---
+
+## Pytania i odpowiedzi
+
+**Czy muszę to uruchamiać ręcznie za każdym razem?**  
+Tak – dwa osobne procesy, ale `start.bat` robi to za Ciebie jednym kliknięciem.
+
+**Dlaczego dwa osobne serwisy?**  
+Python i .NET to dwa różne środowiska uruchomieniowe. Python obsługuje modele AI (DeepFace), .NET obsługuje bazę danych i stronę webową.
+
+**Jak otworzyć w Visual Studio?**  
+Otwórz plik `backend/FaceRecognitionSystem.slnx` w Visual Studio 2022+ – i kliknij ▶ Run.  
+Ale równie dobrze działa `dotnet run` z linii poleceń.
+
+**Czy mogę uruchomić tylko w linii poleceń bez Visual Studio?**  
+Tak, wystarczy `start.bat` – Visual Studio nie jest wymagane.
 
 ---
 
