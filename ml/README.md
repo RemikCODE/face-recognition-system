@@ -100,10 +100,59 @@ pip install -r requirements.txt
 
 ---
 
-### Krok 2 – Przygotuj folder z zdjęciami referencyjnymi
+## Uruchomienie (3 kroki)
 
-Utwórz folder `ml/dataset/` i wrzuć do niego **zdjęcia twarzy ze swojego datasetu**.  
-Nazwy plików muszą odpowiadać kolumnie `label` z CSV:
+### Krok 1 – Zainstaluj zależności
+
+```bash
+cd ml
+pip install -r requirements.txt
+```
+
+> Pobiera TensorFlow + DeepFace – tylko raz, może chwilę potrwać (~600 MB).
+
+---
+
+### Krok 2 – Przygotuj folder z zdjęciami twarzy
+
+#### Masz pobrany plik `archive.zip`? → użyj gotowego skryptu
+
+Twoje archiwum ma taką strukturę:
+
+```
+archive.zip
+├── faces.csv                            ← plik CSV (id, label)
+├── Faces/
+│   └── Faces/                           ← ✅ TO JEST TEN FOLDER – przycięte twarze
+│       ├── Robert Downey Jr_87.jpg      (każda osoba ma kilkadziesiąt zdjęć)
+│       ├── Robert Downey Jr_23.jpg
+│       └── ...
+└── Original Images/
+    └── Original Images/                 ← ❌ NIE UŻYWAJ – zdjęcia całego ciała
+        ├── Robert Downey Jr/
+        │   └── ...
+        └── ...
+```
+
+**DeepFace potrzebuje tylko przyciętych twarzy** – czyli folderu `Faces/Faces/`.  
+Folder `Original Images/` możesz zignorować.
+
+**Jak skopiować zdjęcia do `ml/dataset/`:**
+
+**Opcja A – skrypt (zalecane):** Kliknij dwa razy `ml\prepare-dataset.bat` i podaj ścieżkę do ZIPa.  
+Albo z terminala:
+
+```cmd
+cd ml
+python prepare-dataset.py --zip C:\Users\Ty\Downloads\archive.zip
+```
+
+**Opcja B – ręcznie:**
+1. Rozpakuj `archive.zip`
+2. Wejdź do `archive\Faces\Faces\`
+3. Zaznacz wszystkie pliki (`Ctrl+A`) i skopiuj je do folderu `ml\dataset\`
+
+Po skopiowaniu `ml/dataset/` powinien wyglądać tak:
 
 ```
 ml/
@@ -111,10 +160,8 @@ ml/
     ├── Robert Downey Jr_87.jpg
     ├── Robert Downey Jr_23.jpg
     ├── Scarlett Johansson_12.jpg
-    └── ...   (wszystkie ~2800 zdjęć)
+    └── ...   (wszystkie ~2800 zdjęć płasko w jednym folderze)
 ```
-
-> Możesz umieścić pliki płasko lub w podfolderach – DeepFace znajdzie je rekurencyjnie.
 
 ---
 

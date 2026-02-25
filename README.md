@@ -35,18 +35,24 @@ pip install -r requirements.txt
 
 ---
 
-### Krok 3 – Wrzuć zdjęcia twarzy
+### Krok 3 – Wrzuć zdjęcia twarzy do `ml/dataset/`
 
-Utwórz folder `ml\dataset\` i skopiuj do niego zdjęcia ze swojego datasetu.  
-Nazwy plików muszą być dokładnie takie jak w CSV (np. `Robert Downey Jr_87.jpg`).
+Masz pobrany `archive.zip`? W środku są **dwa foldery** – użyj tylko właściwego:
 
+| Folder w ZIP | Co zawiera | Czy używać? |
+|---|---|---|
+| `Faces/Faces/` | Przycięte twarze (płasko, ~2800 plików) | ✅ **TAK – ten folder** |
+| `Original Images/Original Images/` | Zdjęcia całego ciała (podfoldery) | ❌ nie |
+
+**Najszybciej – skrypt:** kliknij dwa razy `ml\prepare-dataset.bat` i podaj ścieżkę do ZIPa.  
+Albo z terminala:
+
+```cmd
+cd ml
+python prepare-dataset.py --zip C:\Users\Ty\Downloads\archive.zip
 ```
-ml/
-└── dataset/
-    ├── Robert Downey Jr_87.jpg
-    ├── Scarlett Johansson_12.jpg
-    └── ...
-```
+
+**Ręcznie:** rozpakuj ZIP → wejdź do `archive\Faces\Faces\` → zaznacz wszystko (`Ctrl+A`) → skopiuj do `ml\dataset\`.
 
 ---
 
