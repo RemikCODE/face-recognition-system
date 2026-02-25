@@ -1,95 +1,56 @@
 """
 service.py – serwis HTTP do rozpoznawania twarzy.
 
+Używa gotowych, wytrenowanych modeli DeepFace (Facenet512).
+Nie wymaga żadnego trenowania – wystarczy podać folder ze zdjęciami referencyjnymi.
+
 Nasłuchuje na porcie 5001.
 Przyjmuje POST /recognize z polem 'image' (multipart/form-data).
 Zwraca JSON: { "label": "Robert Downey Jr_87.jpg", "confidence": 0.92 }
 
 Użycie:
     python service.py
-    python service.py --embeddings embeddings.pkl --port 5001
+    python service.py --dataset ./dataset --port 5001
 """
 
 import argparse
 import os
-import pickle
 import sys
 import tempfile
 from pathlib import Path
 
-import numpy as np
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 # ── Konfiguracja ─────────────────────────────────────────────────────────────
-DEFAULT_EMBEDDINGS = Path(__file__).parent / "embeddings.pkl"
+DEFAULT_DATASET = Path(__file__).parent / "dataset"
 DEFAULT_PORT = 5001
 
-# Próg podobieństwa kosinusowego (0 = identyczne, 2 = zupełnie różne)
-# Dla Facenet512 typowo: <0.40 = ta sama osoba
-COSINE_THRESHOLD = 0.40
+# Model i metryka odległości
+MODEL_NAME = "Facenet512"   # gotowy, wytrenowany model – pobierany automatycznie (~90 MB)
+DETECTOR = "opencv"         # najszybszy detektor twarzy
+DISTANCE_METRIC = "cosine"
 
-MODEL_NAME = "Facenet512"
-DETECTOR = "opencv"
-
-# ── Globalne dane (ładowane raz przy starcie) ─────────────────────────────────
-_embeddings_data = None
-_embeddings_matrix = None   # shape: (N, D)
-_labels = []
+# Globalna ścieżka do datasetu (ustawiana przy starcie)
+_dataset_path = None
 
 app = Flask(__name__)
 CORS(app)  # pozwala na zapytania z ASP.NET / przeglądarki
 
 
-def load_embeddings(path):
-    """Ładuje embeddingi z pliku pkl do pamięci."""
-    global _embeddings_data, _embeddings_matrix, _labels, MODEL_NAME, DETECTOR
-
-    if not Path(path).exists():
-        print(f"❌ Brak pliku embeddingów: {path}", file=sys.stderr)
-        return False
-
-    with open(path, "rb") as f:
-        _embeddings_data = pickle.load(f)
-
-    MODEL_NAME = _embeddings_data.get("model", MODEL_NAME)
-    DETECTOR = _embeddings_data.get("detector", DETECTOR)
-    records = _embeddings_data["embeddings"]
-
-    _labels = [r["label"] for r in records]
-    _embeddings_matrix = np.stack([r["embedding"] for r in records])  # (N, D)
-
-    print(f"✅ Załadowano {len(_labels)} embeddingów (model: {MODEL_NAME})")
-    return True
-
-
-def find_best_match(query_embedding):
-    """Zwraca (label, confidence) dla najbardziej podobnej twarzy w bazie."""
-    if _embeddings_matrix is None or len(_labels) == 0:
-        return None, 0.0
-
-    q = query_embedding / (np.linalg.norm(query_embedding) + 1e-10)
-    db = _embeddings_matrix / (np.linalg.norm(_embeddings_matrix, axis=1, keepdims=True) + 1e-10)
-    distances = 1.0 - db @ q  # cosine distance (N,)
-
-    best_idx = int(np.argmin(distances))
-    best_dist = float(distances[best_idx])
-
-    if best_dist > COSINE_THRESHOLD:
-        return None, float(max(0.0, 1.0 - best_dist / COSINE_THRESHOLD))
-
-    confidence = float(max(0.0, 1.0 - best_dist / COSINE_THRESHOLD))
-    return _labels[best_idx], confidence
-
-
 @app.route("/health", methods=["GET"])
 def health():
     """Prosty endpoint diagnostyczny."""
-    loaded = _embeddings_matrix is not None
+    dataset_ok = _dataset_path is not None and Path(_dataset_path).exists()
+    count = 0
+    if dataset_ok:
+        count = sum(1 for f in Path(_dataset_path).rglob("*")
+                    if f.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp"})
     return jsonify({
         "status": "ok",
-        "embeddings_loaded": loaded,
-        "embeddings_count": len(_labels) if loaded else 0,
+        "dataset": str(_dataset_path),
+        "dataset_exists": dataset_ok,
+        "images_in_dataset": count,
         "model": MODEL_NAME,
     })
 
@@ -99,12 +60,18 @@ def recognize():
     """
     Przyjmuje zdjęcie twarzy i zwraca nazwę osoby.
 
+    Używa gotowego modelu Facenet512 (DeepFace) do porównania twarzy
+    ze zdjęciami w folderze dataset/.
+
     Request:  POST multipart/form-data, pole 'image'
     Response: { "label": "Robert Downey Jr_87.jpg", "confidence": 0.92 }
               lub { "label": "", "confidence": 0.0 } gdy twarz nieznana
     """
-    if _embeddings_matrix is None:
-        return jsonify({"error": "Embeddingi nie są załadowane. Uruchom najpierw train.py."}), 503
+    if _dataset_path is None or not Path(_dataset_path).exists():
+        return jsonify({
+            "error": f"Folder z datasystem nie istnieje: {_dataset_path}. "
+                     "Utwórz folder dataset/ i umieść w nim zdjęcia twarzy."
+        }), 503
 
     if "image" not in request.files:
         return jsonify({"error": "Brakuje pola 'image' w formularzu."}), 400
@@ -120,18 +87,46 @@ def recognize():
             file.save(tmp.name)
             tmp_path = tmp.name
 
-        from deepface import DeepFace  # importujemy tu, żeby TF nie blokował startu serwisu
-        result = DeepFace.represent(
+        # Importujemy tu, żeby TensorFlow nie spowalniał startu serwisu
+        from deepface import DeepFace
+
+        # DeepFace.find() używa gotowego, wytrenowanego modelu.
+        # Przy pierwszym wywołaniu automatycznie oblicza i cachuje reprezentacje
+        # wszystkich zdjęć z datasetu w pliku .pkl (następne wywołania są szybkie).
+        results = DeepFace.find(
             img_path=tmp_path,
+            db_path=str(_dataset_path),
             model_name=MODEL_NAME,
+            distance_metric=DISTANCE_METRIC,
             detector_backend=DETECTOR,
             enforce_detection=True,
             align=True,
+            silent=True,
         )
-        query_emb = np.array(result[0]["embedding"])
+
+        # results to lista DataFrames (po jednym na każdą wykrytą twarz).
+        # Bierzemy pierwsze dopasowanie dla pierwszej wykrytej twarzy.
+        if not results or results[0].empty:
+            return jsonify({"label": "", "confidence": 0.0})
+
+        df = results[0].sort_values("distance")
+        best = df.iloc[0]
+
+        # Wyciągnij samą nazwę pliku (bez pełnej ścieżki)
+        label = Path(str(best["identity"])).name
+
+        # DeepFace zwraca confidence w skali 0-100; normalizujemy do 0.0-1.0
+        raw_confidence = float(best.get("confidence", 0))
+        confidence = round(raw_confidence / 100.0, 4)
+
+        return jsonify({"label": label, "confidence": confidence})
 
     except Exception as exc:
-        return jsonify({"error": f"Nie wykryto twarzy: {exc}"}), 422
+        msg = str(exc)
+        # Zwykły błąd braku twarzy → 422; błędy serwisu → 500
+        if "Face could not be detected" in msg or "No face" in msg.lower():
+            return jsonify({"error": f"Nie wykryto twarzy na zdjęciu: {msg}"}), 422
+        return jsonify({"error": f"Błąd rozpoznawania: {msg}"}), 500
     finally:
         if tmp_path:
             try:
@@ -139,33 +134,32 @@ def recognize():
             except Exception:
                 pass
 
-    label, confidence = find_best_match(query_emb)
-
-    if label is None:
-        return jsonify({"label": "", "confidence": 0.0})
-
-    return jsonify({"label": label, "confidence": round(confidence, 4)})
-
 
 def main():
-    global COSINE_THRESHOLD
+    global _dataset_path
 
-    parser = argparse.ArgumentParser(description="Serwis rozpoznawania twarzy")
-    parser.add_argument("--embeddings", default=str(DEFAULT_EMBEDDINGS),
-                        help=f"Plik z embeddingami (domyslnie: {DEFAULT_EMBEDDINGS})")
+    parser = argparse.ArgumentParser(
+        description="Serwis rozpoznawania twarzy (gotowy model Facenet512, bez trenowania)"
+    )
+    parser.add_argument("--dataset", default=str(DEFAULT_DATASET),
+                        help=f"Folder z referencyjnymi zdjęciami twarzy (domyslnie: {DEFAULT_DATASET})")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT,
                         help=f"Port HTTP (domyslnie: {DEFAULT_PORT})")
     parser.add_argument("--host", default="0.0.0.0",
                         help="Adres nasluchiwania (domyslnie: 0.0.0.0)")
-    parser.add_argument("--threshold", type=float, default=COSINE_THRESHOLD,
-                        help=f"Prog odleglosci kosinusowej (domyslnie: {COSINE_THRESHOLD})")
     args = parser.parse_args()
 
-    COSINE_THRESHOLD = args.threshold
+    _dataset_path = args.dataset
 
-    if not load_embeddings(args.embeddings):
-        print("⚠ Uruchomiono bez embeddingów. Uruchom najpierw: python train.py")
-        print("  Serwis wystartuje, ale /recognize zwróci błąd 503.")
+    if not Path(_dataset_path).exists():
+        print(f"⚠ Folder datasetu nie istnieje: {_dataset_path}")
+        print("  Utwórz folder i umieść w nim zdjęcia twarzy (np. Robert Downey Jr_87.jpg)")
+        print("  Serwis wystartuje, ale /recognize zwróci błąd 503 do czasu utworzenia folderu.")
+    else:
+        img_count = sum(1 for f in Path(_dataset_path).rglob("*")
+                        if f.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp"})
+        print(f"✅ Dataset: {_dataset_path} ({img_count} zdjęć)")
+        print(f"   Model:   {MODEL_NAME} (gotowy, wytrenowany – pobierany automatycznie przy pierwszym użyciu)")
 
     print(f"\n🚀 Serwis startuje na http://{args.host}:{args.port}")
     print(f"   POST http://localhost:{args.port}/recognize  <- wyslij zdjecie twarzy")

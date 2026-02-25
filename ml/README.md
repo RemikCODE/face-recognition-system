@@ -1,32 +1,47 @@
 # ML Service – rozpoznawanie twarzy (Python)
 
-Serwis HTTP oparty na **DeepFace** + **Facenet512** przyjmuje zdjęcie twarzy,  
-porównuje je z bazą embeddingów i zwraca imię osoby.
+Serwis HTTP oparty na **DeepFace** + gotowym, wytrenowanym modelu **Facenet512**.  
+Przyjmuje zdjęcie twarzy i zwraca imię osoby.  
+**Nie wymaga żadnego trenowania** – wystarczy podać folder ze zdjęciami referencyjnymi.
 
 ---
 
-## Wymagania
+## Jak to działa
 
-- Python 3.10+
-- pip
+```
+Zdjęcie (JPG/PNG)
+      │
+      ▼
+  DeepFace.find()  ← gotowy model Facenet512 (pobierany automatycznie ~90 MB)
+      │              porównuje twarz z każdym zdjęciem w dataset/
+      ▼
+  Najlepsze dopasowanie  → zwróć label + confidence
+```
+
+DeepFace przy pierwszym wywołaniu automatycznie:
+1. Pobiera wagi modelu Facenet512 (~90 MB) z internetu
+2. Oblicza reprezentacje wszystkich zdjęć z datasetu i zapisuje je w pliku `.pkl` (cache)
+3. Kolejne zapytania są szybkie – cache jest odczytywany z dysku
 
 ---
 
-## Krok 1 – Zainstaluj zależności
+## Uruchomienie (3 kroki)
+
+### Krok 1 – Zainstaluj zależności
 
 ```bash
 cd ml
 pip install -r requirements.txt
 ```
 
-> Instalacja pobiera TensorFlow (~600 MB) i modele DeepFace (~250 MB) – tylko raz.
+> Pobiera TensorFlow + DeepFace – tylko raz, może chwilę potrwać (~600 MB).
 
 ---
 
-## Krok 2 – Przygotuj dataset
+### Krok 2 – Przygotuj folder z zdjęciami referencyjnymi
 
-Utwórz folder `ml/dataset/` i umieść w nim **zdjęcia twarzy**.  
-Nazwa pliku musi odpowiadać kolumnie `label` z CSV:
+Utwórz folder `ml/dataset/` i wrzuć do niego **zdjęcia twarzy ze swojego datasetu**.  
+Nazwy plików muszą odpowiadać kolumnie `label` z CSV:
 
 ```
 ml/
@@ -34,46 +49,14 @@ ml/
     ├── Robert Downey Jr_87.jpg
     ├── Robert Downey Jr_23.jpg
     ├── Scarlett Johansson_12.jpg
-    └── ...
+    └── ...   (wszystkie ~2800 zdjęć)
 ```
 
-Dataset opisany w zadaniu (CSV z ~2800 rekordów) ma format `Imię Nazwisko_N.jpg`.  
-Możesz umieścić pliki płasko lub w podfolderach – skrypt znajdzie je rekurencyjnie.
+> Możesz umieścić pliki płasko lub w podfolderach – DeepFace znajdzie je rekurencyjnie.
 
 ---
 
-## Krok 3 – Oblicz embeddingi (trenowanie)
-
-```bash
-cd ml
-python train.py
-```
-
-Domyślnie szuka:
-- CSV: `../backend/data/sample_faces.csv`
-- Obrazów: `./dataset/`
-
-Możesz podać własne ścieżki:
-
-```bash
-python train.py --dataset C:\moj_dataset --csv C:\faces.csv
-```
-
-Po zakończeniu powstaje plik `ml/embeddings.pkl` (~kilka MB).
-
-### Opcje `train.py`
-
-| Opcja | Domyślnie | Opis |
-|-------|-----------|------|
-| `--dataset` | `./dataset/` | Folder ze zdjęciami |
-| `--csv` | `../backend/data/sample_faces.csv` | Plik CSV |
-| `--output` | `./embeddings.pkl` | Plik wyjściowy |
-| `--model` | `Facenet512` | Model: `Facenet512`, `ArcFace`, `VGG-Face` |
-| `--detector` | `opencv` | Detektor: `opencv`, `retinaface`, `mtcnn` |
-
----
-
-## Krok 4 – Uruchom serwis
+### Krok 3 – Uruchom serwis
 
 ```bash
 cd ml
@@ -82,13 +65,22 @@ python service.py
 
 Serwis startuje na **`http://localhost:5001`**.
 
-### Opcje `service.py`
+Przy pierwszym zapytaniu DeepFace automatycznie obliczy reprezentacje zdjęć  
+(może potrwać chwilę przy dużym datasecie – tylko raz, później jest cache).
+
+---
+
+## Opcje `service.py`
 
 | Opcja | Domyślnie | Opis |
 |-------|-----------|------|
-| `--embeddings` | `./embeddings.pkl` | Plik z embeddingami |
+| `--dataset` | `./dataset/` | Folder z referencyjnymi zdjęciami twarzy |
 | `--port` | `5001` | Port HTTP |
-| `--threshold` | `0.40` | Próg odległości kosinusowej (niżej = bardziej restrykcyjny) |
+| `--host` | `0.0.0.0` | Adres nasłuchiwania |
+
+```bash
+python service.py --dataset C:\moj_dataset --port 5001
+```
 
 ---
 
@@ -115,9 +107,11 @@ curl -X POST http://localhost:5001/recognize \
 
 **Odpowiedź (brak twarzy na zdjęciu):**
 ```json
-{ "error": "Nie wykryto twarzy: ..." }
+{ "error": "Nie wykryto twarzy na zdjęciu: ..." }
 ```
-Status: `422`
+HTTP status: `422`
+
+---
 
 ### `GET /health`
 
@@ -128,8 +122,9 @@ curl http://localhost:5001/health
 ```json
 {
   "status": "ok",
-  "embeddings_loaded": true,
-  "embeddings_count": 2800,
+  "dataset": "./dataset",
+  "dataset_exists": true,
+  "images_in_dataset": 2800,
   "model": "Facenet512"
 }
 ```
@@ -138,7 +133,7 @@ curl http://localhost:5001/health
 
 ## Podłączenie do backendu ASP.NET
 
-Po uruchomieniu serwisu ML, w `backend/FaceRecognitionApi/appsettings.Development.json` upewnij się, że:
+W `backend/FaceRecognitionApi/appsettings.Development.json` masz już ustawione:
 
 ```json
 {
@@ -148,33 +143,18 @@ Po uruchomieniu serwisu ML, w `backend/FaceRecognitionApi/appsettings.Developmen
 }
 ```
 
-(To jest już domyślnie ustawione.)
+Uruchom najpierw serwis ML, potem backend – i gotowe.
 
 ---
 
-## Jak to działa
+## Wybór modelu (opcjonalne)
 
-```
-Zdjęcie (JPG/PNG)
-      │
-      ▼
-  DeepFace.represent()  ← detekcja twarzy (OpenCV) + embedding (Facenet512, 512 wymiarów)
-      │
-      ▼
-  Porównanie kosinusowe  ← z każdym embeddingiem w embeddings.pkl
-      │
-      ▼
-  Najbliższy sąsiad  ← jeśli odległość < threshold (0.40) → zwróć label
-```
+Możesz zmienić model w `service.py` (zmienna `MODEL_NAME`):
 
----
+| Model | Dokładność | Rozmiar |
+|-------|-----------|---------|
+| `Facenet512` ✅ | ⭐⭐⭐⭐ | ~90 MB |
+| `ArcFace` | ⭐⭐⭐⭐⭐ | ~130 MB |
+| `VGG-Face` | ⭐⭐⭐ | ~550 MB |
 
-## Wybór modelu
-
-| Model | Dokładność | Szybkość | Rozmiar |
-|-------|-----------|---------|---------|
-| `Facenet512` | ⭐⭐⭐⭐ | ⭐⭐⭐ | ~90 MB |
-| `ArcFace` | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ~130 MB |
-| `VGG-Face` | ⭐⭐⭐ | ⭐⭐ | ~550 MB |
-
-Domyślnie używamy `Facenet512` – dobry kompromis między dokładnością a rozmiarem.
+Domyślnie `Facenet512` – dobry kompromis.

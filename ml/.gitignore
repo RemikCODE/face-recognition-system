@@ -1,11 +1,8 @@
-# Wygenerowane przez train.py
-embeddings.pkl
-
-# Folder z obrazami treningowymi (duże pliki, nie commitujemy)
+# Folder z obrazami referencyjnymi (duże pliki, nie commitujemy)
 dataset/
 
-# Wagi modeli DeepFace (pobierane automatycznie przez bibliotekę)
-~/.deepface/
+# Cache DeepFace (tworzony automatycznie przez DeepFace.find w folderze dataset/)
+*.pkl
 
 # Python cache
 __pycache__/

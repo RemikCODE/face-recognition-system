@@ -118,17 +118,15 @@ desktop/
 ```
 ml/
 ├── requirements.txt          ← zależności Python (pip install -r requirements.txt)
-├── train.py                  ← oblicza embeddingi z datasetu i zapisuje do embeddings.pkl
 ├── service.py                ← Flask HTTP serwis na porcie 5001; przyjmuje POST /recognize
+├── requirements.txt          ← zależności Python
 ├── README.md                 ← pełna dokumentacja ML
-├── .gitignore                ← wyklucza dataset/ i embeddings.pkl z gita
+├── .gitignore                ← wyklucza dataset/ z gita
 │
-├── dataset/                  ← (UTWÓRZ SAM) folder ze zdjęciami twarzy
-│   ├── Robert Downey Jr_87.jpg
-│   ├── Scarlett Johansson_12.jpg
-│   └── ...                   ← nazwy plików = kolumna 'label' z CSV
-│
-└── embeddings.pkl            ← (generowany przez train.py) wektory 512-dim dla każdej twarzy
+└── dataset/                  ← (UTWÓRZ SAM) folder ze zdjęciami twarzy
+    ├── Robert Downey Jr_87.jpg
+    ├── Scarlett Johansson_12.jpg
+    └── ...                   ← nazwy plików = kolumna 'label' z CSV
 ```
 
 ---
@@ -156,10 +154,9 @@ pip install -r requirements.txt
 # 2. Umieść zdjęcia twarzy w folderze ml/dataset/
 #    (pliki muszą mieć nazwy jak w CSV, np. "Robert Downey Jr_87.jpg")
 
-# 3. Oblicz embeddingi (to może chwilę zająć)
-python train.py
-
-# 4. Uruchom serwis – nasłuchuje na porcie 5001
+# 3. Uruchom serwis – nasłuchuje na porcie 5001
+#    Model Facenet512 jest gotowy (wytrenowany) – nie trzeba nic trenować.
+#    Przy pierwszym zapytaniu DeepFace automatycznie pobierze wagi modelu (~90 MB).
 python service.py
 ```
 
@@ -306,6 +303,6 @@ Desktop MAUI   ──┼──────────────────�
 Mobilna MAUI   ──┘                              port 5233                         port 5001
                                                      │                                │
                                                      ▼                                ▼
-                                               Razor Pages UI                  embeddings.pkl
+                                               Razor Pages UI                  cache .pkl (auto)
                                                REST API /swagger               (wektory twarzy)
 ```
