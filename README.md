@@ -25,6 +25,12 @@ cd ml
 pip install -r requirements.txt
 ```
 
+> ⚠ **Windows – błąd "Long Path"?** Zamiast powyższego użyj `ml\setup-windows.bat` (kliknij dwa razy) lub włącz długie ścieżki komendą w CMD jako administrator:  
+> `reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f`  
+> Pełna instrukcja: [`ml/README.md`](ml/README.md)
+
+> ⚠ **Python 3.13 / Microsoft Store?** TensorFlow nie obsługuje Python 3.13. Pobierz [Python 3.12 z python.org](https://www.python.org/downloads/).
+
 **.NET backend** – pobierz i zainstaluj [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8) (jeśli jeszcze nie masz).
 
 ---
@@ -257,7 +263,17 @@ ml/
 dotnet workload install maui
 ```
 
-3. **Python 3.10+** – wymagany do serwisu ML (masz już pobranego ✅)
+3. **Python 3.10–3.12** – wymagany do serwisu ML  
+   ⚠ **NIE Python 3.13** – TensorFlow go nie obsługuje  
+   ⚠ **NIE Python ze sklepu Microsoft Store** – powoduje błąd "Long Path"  
+   Pobierz Python 3.12 z: https://www.python.org/downloads/
+
+   **Windows – błąd "Long Path" podczas `pip install`?**  
+   Uruchom CMD jako administrator i wykonaj:
+   ```cmd
+   reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f
+   ```
+   Uruchom ponownie komputer. Albo użyj gotowego skryptu `ml\setup-windows.bat`.
 
 ---
 

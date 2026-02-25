@@ -6,6 +6,68 @@ Przyjmuje zdjęcie twarzy i zwraca imię osoby.
 
 ---
 
+## ⚠ Przed instalacją na Windows – przeczytaj
+
+### Problem: błąd "Long Path" podczas `pip install`
+
+```
+ERROR: Could not install packages due to an OSError:
+HINT: This error might have occurred since this system does not have Windows Long Path support enabled.
+```
+
+TensorFlow ma bardzo zagnieżdżone ścieżki wewnętrzne, które przekraczają domyślny limit Windows (260 znaków).
+
+**Masz dwie opcje – wybierz jedną:**
+
+---
+
+#### ✅ Opcja A – Włącz długie ścieżki (zalecane, wymaga admina, 1 komenda)
+
+Otwórz **CMD lub PowerShell jako Administrator** i wklej:
+
+```cmd
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f
+```
+
+Następnie **uruchom ponownie komputer** i wróć do normalnej instalacji:
+
+```cmd
+cd ml
+pip install -r requirements.txt
+python service.py
+```
+
+---
+
+#### ✅ Opcja B – Użyj krótkiej ścieżki venv (bez admina)
+
+Kliknij dwa razy **`ml\setup-windows.bat`** – skrypt sam:
+1. Tworzy środowisko wirtualne w `C:\facerecog\venv` (krótka ścieżka)
+2. Instaluje wszystkie zależności
+3. Generuje `ml\run-windows.bat` do uruchamiania serwisu
+
+Potem zamiast `python service.py` używasz:
+```cmd
+run-windows.bat
+```
+
+---
+
+### Problem: Python 3.13
+
+TensorFlow **nie obsługuje Python 3.13**. Wymagany jest Python **3.10, 3.11 lub 3.12**.
+
+Sprawdź wersję:
+```cmd
+python --version
+```
+
+Jeśli masz 3.13 (lub jeśli Python był zainstalowany ze **sklepu Microsoft Store**),  
+pobierz Python 3.12 ze strony: **https://www.python.org/downloads/**  
+*(Podczas instalacji zaznacz "Add Python to PATH")*
+
+---
+
 ## Jak to działa
 
 ```

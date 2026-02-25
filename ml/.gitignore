@@ -16,3 +16,6 @@ __pycache__/
 # Tymczasowe pliki
 *.tmp
 *.log
+
+# Generowany przez setup-windows.bat
+run-windows.bat
