@@ -26,7 +26,7 @@ public class IndexModel : PageModel
     public string? Search { get; set; }
 
     [BindProperty]
-    public string? CsvFilePath { get; set; }
+    public IFormFile? CsvFile { get; set; }
 
     public string? SeedMessage { get; set; }
     public bool SeedSuccess { get; set; }
@@ -45,22 +45,23 @@ public class IndexModel : PageModel
 
     public async Task<IActionResult> OnPostSeedAsync()
     {
-        if (string.IsNullOrWhiteSpace(CsvFilePath))
+        if (CsvFile is null || CsvFile.Length == 0)
         {
-            SeedMessage = "Podaj ścieżkę do pliku CSV.";
+            SeedMessage = "Wybierz plik CSV przed kliknięciem Załaduj.";
             SeedSuccess = false;
         }
         else
         {
-            var count = await _csvImport.ImportAsync(CsvFilePath.Trim());
+            using var stream = CsvFile.OpenReadStream();
+            var count = await _csvImport.ImportFromStreamAsync(stream);
             if (count > 0)
             {
-                SeedMessage = $"✅ Załadowano {count} rekordów z pliku CSV.";
+                SeedMessage = $"✅ Załadowano {count} rekordów z pliku \"{CsvFile.FileName}\".";
                 SeedSuccess = true;
             }
             else
             {
-                SeedMessage = $"⚠ Nie znaleziono rekordów. Sprawdź ścieżkę: {CsvFilePath}";
+                SeedMessage = $"⚠ Plik \"{CsvFile.FileName}\" nie zawiera rekordów. Sprawdź format CSV (kolumny: id, label).";
                 SeedSuccess = false;
             }
         }

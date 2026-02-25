@@ -64,11 +64,7 @@ Otwórz przeglądarkę: `http://localhost:5233`
 
 ### Krok 5 – Załaduj bazę danych z CSV
 
-Otwórz `http://localhost:5233/swagger` → `POST /api/persons/seed` → **Try it out** → wklej:
-
-```json
-{ "csvFilePath": "C:\\ścieżka\\do\\faces.csv" }
-```
+Otwórz `http://localhost:5233/Persons` → kliknij **Wybierz plik** → wybierz swój plik CSV z dysku → kliknij **Załaduj**.
 
 > Przykładowy plik CSV: `backend/data/sample_faces.csv`
 
@@ -125,9 +121,7 @@ Zostaw to okno otwarte. Po uruchomieniu otwórz przeglądarkę:
 ### Załaduj CSV (raz, po pierwszym starcie)
 
 1. Otwórz `http://localhost:5233/Persons` w przeglądarce
-2. W polu **"Załaduj bazę danych z pliku CSV"** wpisz pełną ścieżkę do swojego pliku CSV, np.:
-   - Windows: `C:\Users\Ty\Desktop\faces.csv`
-   - Względna (jeśli plik jest w repozytorium): wpisz pełną ścieżkę
+2. Kliknij **Wybierz plik** w sekcji "Załaduj bazę danych z pliku CSV" i wybierz swój plik CSV z dysku
 3. Kliknij **Załaduj** – baza zostanie wypełniona automatycznie
 
 > Przykładowy plik CSV z 8 rekordami: `backend/data/sample_faces.csv`

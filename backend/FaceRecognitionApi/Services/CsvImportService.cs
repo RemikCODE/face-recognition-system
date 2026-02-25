@@ -18,10 +18,7 @@ public class CsvImportService
     }
 
     /// <summary>
-    /// Seeds the Persons table from a CSV file.
-    /// Expected CSV format (with header): id,label
-    /// where label is a filename like "Robert Downey Jr_87.jpg"
-    /// The person name is extracted by removing the trailing "_N.jpg" suffix.
+    /// Seeds the Persons table from a CSV file path on the server.
     /// </summary>
     public async Task<int> ImportAsync(string csvFilePath)
     {
@@ -31,6 +28,19 @@ public class CsvImportService
             return 0;
         }
 
+        using var stream = File.OpenRead(csvFilePath);
+        var count = await ImportFromStreamAsync(stream);
+        _logger.LogInformation("Imported {Count} records from {Path}", count, csvFilePath);
+        return count;
+    }
+
+    /// <summary>
+    /// Seeds the Persons table from an uploaded CSV stream (e.g. IFormFile).
+    /// Expected CSV format (with header): id,label
+    /// where label is a filename like "Robert Downey Jr_87.jpg"
+    /// </summary>
+    public async Task<int> ImportFromStreamAsync(Stream csvStream)
+    {
         var config = new CsvConfiguration(CultureInfo.InvariantCulture)
         {
             HasHeaderRecord = true,
@@ -39,7 +49,7 @@ public class CsvImportService
             PrepareHeaderForMatch = args => args.Header.ToLowerInvariant(),
         };
 
-        using var reader = new StreamReader(csvFilePath);
+        using var reader = new StreamReader(csvStream, leaveOpen: true);
         using var csv = new CsvReader(reader, config);
 
         var records = new List<Person>();
@@ -56,7 +66,7 @@ public class CsvImportService
 
         if (records.Count == 0)
         {
-            _logger.LogWarning("No records found in CSV file: {Path}", csvFilePath);
+            _logger.LogWarning("No records found in uploaded CSV stream.");
             return 0;
         }
 
@@ -64,7 +74,7 @@ public class CsvImportService
         await _db.Persons.AddRangeAsync(records);
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation("Imported {Count} records from {Path}", records.Count, csvFilePath);
+        _logger.LogInformation("Imported {Count} records from uploaded CSV.", records.Count);
         return records.Count;
     }
 

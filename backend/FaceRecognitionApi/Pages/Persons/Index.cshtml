@@ -16,18 +16,14 @@
     </div>
     <div class="card-body">
         <p class="card-text text-muted small mb-2">
-            Podaj pełną ścieżkę do pliku CSV na serwerze (np.
-            <code>C:\Users\Ty\faces.csv</code> lub
-            <code>/home/user/faces.csv</code>).
+            Wybierz swój plik CSV z dysku i kliknij <strong>Załaduj</strong>.
             Format CSV: kolumny <code>id</code> i <code>label</code>
             (np. <code>1,Robert Downey Jr_87.jpg</code>).
         </p>
-        <form method="post" asp-page-handler="Seed">
+        <form method="post" asp-page-handler="Seed" enctype="multipart/form-data">
             @Html.AntiForgeryToken()
             <div class="input-group">
-                <input type="text" class="form-control" name="CsvFilePath"
-                       value="@Model.CsvFilePath"
-                       placeholder="C:\ścieżka\do\faces.csv" />
+                <input type="file" class="form-control" name="CsvFile" accept=".csv,.txt" />
                 <button type="submit" class="btn btn-primary">Załaduj</button>
             </div>
         </form>
