@@ -53,17 +53,17 @@ run-windows.bat
 
 ---
 
-### Problem: Python 3.13
+### Problem: nieobsługiwana wersja Pythona
 
-TensorFlow **nie obsługuje Python 3.13**. Wymagany jest Python **3.10, 3.11 lub 3.12**.
+Wymagany jest Python **3.10, 3.11, 3.12 lub 3.13**.
 
 Sprawdź wersję:
 ```cmd
 python --version
 ```
 
-Jeśli masz 3.13 (lub jeśli Python był zainstalowany ze **sklepu Microsoft Store**),  
-pobierz Python 3.12 ze strony: **https://www.python.org/downloads/**  
+Jeśli masz starszą wersję (np. 3.9 lub niższą), lub jeśli Python był zainstalowany ze **sklepu Microsoft Store**,  
+pobierz Python 3.13 lub 3.12 ze strony: **https://www.python.org/downloads/**  
 *(Podczas instalacji zaznacz "Add Python to PATH")*
 
 ---
