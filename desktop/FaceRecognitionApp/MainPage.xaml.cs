@@ -33,7 +33,7 @@ public partial class MainPage : ContentPage
         {
             var result = await FilePicker.Default.PickAsync(new PickOptions
             {
-                Title = "Select a face image",
+                PickerTitle = "Select a face image",
                 FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
                 {
                     { DevicePlatform.WinUI,       new[] { ".jpg", ".jpeg", ".png", ".bmp" } },
