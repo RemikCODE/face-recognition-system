@@ -1,8 +1,8 @@
 # Python ML service – face recognition
 # Instalacja: pip install -r requirements.txt
 #
-# ⚠ WYMAGANIA PYTHONA: Python 3.10 – 3.12 (TensorFlow NIE obsługuje Python 3.13)
-#   Pobierz Python 3.12 z https://www.python.org/downloads/
+# ⚠ WYMAGANIA PYTHONA: Python 3.10 – 3.13
+#   Pobierz Python 3.12 lub 3.13 z https://www.python.org/downloads/
 #
 # ⚠ WINDOWS: Jeśli instalacja się nie powiedzie z błędem "long path",
 #   uruchom jako administrator:
@@ -14,8 +14,8 @@
 deepface>=0.0.98
 flask>=3.1.0
 flask-cors>=6.0.0
-numpy>=1.24.0,<2.0.0
+numpy>=1.24.0
 pillow>=10.0.0
 opencv-python-headless>=4.8.0   # headless = brak GUI, krótsze ścieżki niż opencv-python
 tf-keras>=2.16.0
-tensorflow>=2.16.0,<2.19.0
+tensorflow>=2.16.0
