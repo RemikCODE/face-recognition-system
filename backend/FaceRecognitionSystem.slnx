@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="FaceRecognitionApi.Tests/FaceRecognitionApi.Tests.csproj" />
+  <Project Path="FaceRecognitionApi/FaceRecognitionApi.csproj" />
+</Solution>
