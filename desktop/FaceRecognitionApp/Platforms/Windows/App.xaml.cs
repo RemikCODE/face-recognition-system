@@ -16,7 +16,7 @@ public partial class App : MauiWinUIApplication
         Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
     {
         e.Handled = true;
-        var xamlRoot = Microsoft.Maui.MauiWinUIApplication.Current.Window?.Content?.XamlRoot;
+        var xamlRoot = (Microsoft.Maui.Controls.Application.Current?.Windows.FirstOrDefault()?.Handler?.PlatformView as Microsoft.UI.Xaml.Window)?.Content?.XamlRoot;
         if (xamlRoot is null) return;
 
         try
