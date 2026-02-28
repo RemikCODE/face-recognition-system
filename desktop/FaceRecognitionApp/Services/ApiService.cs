@@ -17,11 +17,15 @@ public class ApiService
 
     /// <summary>
     /// Default base URL:
+    ///   – http://localhost:5233 when running the Windows desktop build.
     ///   – 10.0.2.2  resolves to the host machine's localhost inside the Android emulator.
     ///   – Use the host machine's LAN IP when running on a real physical device.
-    ///   – Use http://localhost:5233 when running the Windows desktop build.
     /// </summary>
+#if WINDOWS || MACCATALYST
+    private const string DefaultBaseUrl = "http://localhost:5233";
+#else
     private const string DefaultBaseUrl = "http://10.0.2.2:5233";
+#endif
 
     public ApiService(HttpClient httpClient)
     {
