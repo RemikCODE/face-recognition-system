@@ -1,28 +1,18 @@
 """
-prepare-dataset.py – kopiuje zdjęcia twarzy z pobranego archiwum do folderu ml/dataset/.
+prepare-dataset.py – kopiuje zdjęcia twarzy z podanego archiwum ZIP do folderu ml/dataset/.
 
-Dataset: Face Recognition Dataset by Vasuki Patel
-Link:    https://www.kaggle.com/datasets/vasukipatel/face-recognition-dataset
-Pobierz: przycisk "Download" na stronie Kaggle → zapisuje się jako archive.zip
+Przygotuj swój dataset:
+  1. Umieść zdjęcia twarzy w folderze (każde zdjęcie nazwij: ImięNazwisko_numer.jpg,
+     np. "Jan Kowalski_1.jpg", "Anna Nowak_2.png").
+  2. Spakuj ten folder do jednego pliku ZIP.
+  3. Uruchom ten skrypt i podaj ścieżkę do ZIPa.
 
-Struktura archiwum (po rozpakowaniu):
-  archive/
-  ├── faces.csv                           ← plik CSV z kolumnami: id, label
-  ├── Faces/
-  │   └── Faces/                          ← ✅ UŻYWAMY TEN FOLDER
-  │       ├── Robert Downey Jr_87.jpg     (przycięte twarze – idealne dla DeepFace)
-  │       ├── Scarlett Johansson_12.jpg
-  │       └── ...
-  └── Original Images/
-      └── Original Images/               ← ❌ NIE UŻYWAMY (zdjęcia całego ciała)
-          ├── Robert Downey Jr/
-          │   └── Robert Downey Jr_87.jpg
-          └── ...
+Wszystkie pliki graficzne z archiwum trafią płasko do folderu ml/dataset/.
 
 Użycie:
   python prepare-dataset.py                          # pyta interaktywnie o ścieżkę
-  python prepare-dataset.py --zip C:\\pobrane\\archive.zip
-  python prepare-dataset.py --dir C:\\rozpakowane\\archive
+  python prepare-dataset.py --zip C:\\pobrane\\moje_twarze.zip
+  python prepare-dataset.py --dir C:\\rozpakowany_folder
 """
 
 import argparse
@@ -34,46 +24,23 @@ from pathlib import Path
 DATASET_DIR = Path(__file__).parent / "dataset"
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
-# Folder wewnątrz archiwum z przyciętymi twarzami
-FACES_SUBDIR_CANDIDATES = [
-    "Faces/Faces",
-    "Faces\\Faces",
-    "faces/faces",
-    "Faces",
-    "faces",
-]
-
-
-def find_faces_dir(root: Path) -> Path | None:
-    """Szuka folderu z przyciętymi twarzami wewnątrz rozpakowanego archiwum."""
-    for candidate in FACES_SUBDIR_CANDIDATES:
-        p = root / candidate
-        if p.exists() and p.is_dir():
-            # Sprawdź czy zawiera pliki graficzne bezpośrednio (nie w podfolderach)
-            imgs = [f for f in p.iterdir() if f.is_file() and f.suffix.lower() in IMAGE_EXTS]
-            if imgs:
-                return p
-    # Fallback: szukaj rekurencyjnie folderu "Faces" z plikami bezpośrednio
-    for d in root.rglob("*"):
-        if d.is_dir() and d.name.lower() == "faces":
-            imgs = [f for f in d.iterdir() if f.is_file() and f.suffix.lower() in IMAGE_EXTS]
-            if imgs:
-                return d
-    return None
-
 
 def count_images(folder: Path) -> int:
-    return sum(1 for f in folder.iterdir() if f.is_file() and f.suffix.lower() in IMAGE_EXTS)
+    return sum(1 for f in folder.rglob("*") if f.is_file() and f.suffix.lower() in IMAGE_EXTS)
 
 
 def copy_to_dataset(source_dir: Path, dest_dir: Path) -> int:
-    """Kopiuje zdjęcia z source_dir do dest_dir. Zwraca liczbę skopiowanych plików."""
+    """Kopiuje wszystkie pliki graficzne z source_dir (rekurencyjnie) do dest_dir płasko."""
     dest_dir.mkdir(parents=True, exist_ok=True)
     copied = 0
     skipped = 0
 
-    images = sorted(f for f in source_dir.iterdir() if f.is_file() and f.suffix.lower() in IMAGE_EXTS)
+    images = sorted(f for f in source_dir.rglob("*") if f.is_file() and f.suffix.lower() in IMAGE_EXTS)
     total = len(images)
+
+    if total == 0:
+        print("\nBrak plików graficznych w podanym folderze.")
+        return 0
 
     print(f"\nKopiowanie {total} zdjęć do {dest_dir} ...")
     for i, img in enumerate(images, 1):
@@ -98,14 +65,14 @@ def extract_zip(zip_path: Path, extract_to: Path) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Przygotuj dataset twarzy z pobranego archiwum ZIP.",
+        description="Przygotuj dataset twarzy z archiwum ZIP lub folderu.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
     parser.add_argument("--zip", metavar="SCIEZKA_DO_ZIP",
-                        help="Ścieżka do pobranego pliku archive.zip")
+                        help="Ścieżka do pliku ZIP ze zdjęciami twarzy")
     parser.add_argument("--dir", metavar="SCIEZKA_DO_FOLDERU",
-                        help="Ścieżka do już rozpakowanego folderu archiwum")
+                        help="Ścieżka do folderu ze zdjęciami twarzy")
     parser.add_argument("--output", metavar="SCIEZKA_DATASET", default=str(DATASET_DIR),
                         help=f"Folder docelowy dataset (domyślnie: {DATASET_DIR})")
     args = parser.parse_args()
@@ -114,82 +81,48 @@ def main():
     print("  Przygotowanie datasetu twarzy dla serwisu ML")
     print("=" * 60)
 
-    # ── Ustal folder źródłowy ─────────────────────────────────────
-    archive_root: Path | None = None
+    source_dir: Path | None = None
 
     if args.dir:
-        archive_root = Path(args.dir)
-        if not archive_root.exists():
-            print(f"\n❌ Folder nie istnieje: {archive_root}")
+        source_dir = Path(args.dir)
+        if not source_dir.exists():
+            print(f"\nFolder nie istnieje: {source_dir}")
             sys.exit(1)
 
     elif args.zip:
         zip_path = Path(args.zip)
         if not zip_path.exists():
-            print(f"\n❌ Plik ZIP nie istnieje: {zip_path}")
+            print(f"\nPlik ZIP nie istnieje: {zip_path}")
             sys.exit(1)
-        archive_root = zip_path.parent / zip_path.stem
-        extract_zip(zip_path, archive_root)
+        source_dir = zip_path.parent / zip_path.stem
+        extract_zip(zip_path, source_dir)
 
     else:
-        # Tryb interaktywny
-        print("\nPodaj ścieżkę do pobranego pliku archive.zip")
-        print("(lub wciśnij Enter jeśli masz już rozpakowany folder)")
+        print("\nPodaj ścieżkę do pliku ZIP ze zdjęciami twarzy:")
         answer = input("Ścieżka: ").strip().strip('"').strip("'")
         if not answer:
-            print("\nPodaj ścieżkę do już rozpakowanego folderu:")
-            answer = input("Ścieżka: ").strip().strip('"').strip("'")
-            archive_root = Path(answer)
+            print("Nie podano ścieżki. Koniec.")
+            sys.exit(1)
+        p = Path(answer)
+        if p.suffix.lower() == ".zip":
+            source_dir = p.parent / p.stem
+            extract_zip(p, source_dir)
         else:
-            p = Path(answer)
-            if p.suffix.lower() == ".zip":
-                archive_root = p.parent / p.stem
-                extract_zip(p, archive_root)
-            else:
-                archive_root = p
+            source_dir = p
 
-        if not archive_root or not archive_root.exists():
-            print(f"\n❌ Ścieżka nie istnieje: {archive_root}")
+        if not source_dir or not source_dir.exists():
+            print(f"\nŚcieżka nie istnieje: {source_dir}")
             sys.exit(1)
 
-    # ── Znajdź folder Faces/Faces ─────────────────────────────────
-    print(f"\nSzukam folderu z twarzami w: {archive_root}")
-    faces_dir = find_faces_dir(archive_root)
-
-    if faces_dir is None:
-        print("\n❌ Nie znaleziono folderu ze zdjęciami twarzy.")
-        print("   Oczekiwana struktura archiwum:")
-        print("     archive/Faces/Faces/*.jpg   ← szukam tutaj")
-        print(f"\n   Zawartość folderu {archive_root}:")
-        for p in sorted(archive_root.iterdir())[:20]:
-            print(f"     {p.name}{'/' if p.is_dir() else ''}")
-        sys.exit(1)
-
-    img_count = count_images(faces_dir)
-    print(f"✅ Znaleziono folder: {faces_dir}")
-    print(f"   Zdjęć do skopiowania: {img_count}")
-
-    if img_count == 0:
-        print("\n❌ Folder istnieje ale jest pusty.")
-        sys.exit(1)
-
-    # ── Informacja o tym co NIE jest potrzebne ─────────────────────
-    orig_dir = archive_root / "Original Images" / "Original Images"
-    if orig_dir.exists():
-        print(f"\nℹ  Folder 'Original Images' zostanie pominięty.")
-        print("   Zawiera zdjęcia całego ciała – DeepFace potrzebuje tylko twarzy.")
-
-    # ── Kopiowanie do dataset/ ─────────────────────────────────────
     dest = Path(args.output)
-    copied = copy_to_dataset(faces_dir, dest)
+    copied = copy_to_dataset(source_dir, dest)
 
-    # ── Podsumowanie ───────────────────────────────────────────────
     final_count = count_images(dest)
-    print(f"\n✅ Gotowe!")
-    print(f"   Folder dataset: {dest}")
-    print(f"   Łącznie zdjęć:  {final_count}")
+    print(f"\nGotowe!")
+    print(f"  Folder dataset: {dest}")
+    print(f"  Lacznie zdiec:  {final_count}")
     print()
-    print("Następny krok – uruchom serwis ML:")
+    print("Nastepny krok - uruchom serwis ML:")
     print("  python service.py")
 
 
