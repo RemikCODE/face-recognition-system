@@ -7,7 +7,7 @@ public partial class MainPage : ContentPage
     private readonly ApiService _apiService;
     private readonly bool _isDesktop;
 
-    private Stream? _photoStream;
+    private byte[]? _photoBytes;
     private string _photoFileName = "photo.jpg";
 
     public MainPage(ApiService apiService)
@@ -47,8 +47,11 @@ public partial class MainPage : ContentPage
             if (result == null) return;
 
             _photoFileName = result.FileName;
-            _photoStream = await result.OpenReadAsync();
-            ShowPhotoPreview(_photoStream);
+            using var raw = await result.OpenReadAsync();
+            using var ms = new MemoryStream();
+            await raw.CopyToAsync(ms);
+            _photoBytes = ms.ToArray();
+            ShowPhotoPreview(_photoBytes);
         }
         catch (Exception ex)
         {
@@ -72,8 +75,11 @@ public partial class MainPage : ContentPage
             if (photo == null) return;
 
             _photoFileName = photo.FileName;
-            _photoStream = await photo.OpenReadAsync();
-            ShowPhotoPreview(_photoStream);
+            using var raw = await photo.OpenReadAsync();
+            using var ms = new MemoryStream();
+            await raw.CopyToAsync(ms);
+            _photoBytes = ms.ToArray();
+            ShowPhotoPreview(_photoBytes);
         }
         catch (Exception ex)
         {
@@ -81,14 +87,9 @@ public partial class MainPage : ContentPage
         }
     }
 
-    private void ShowPhotoPreview(Stream stream)
+    private void ShowPhotoPreview(byte[] bytes)
     {
-        stream.Position = 0;
-        PhotoPreview.Source = ImageSource.FromStream(() =>
-        {
-            stream.Position = 0;
-            return stream;
-        });
+        PhotoPreview.Source = ImageSource.FromStream(() => new MemoryStream(bytes));
         RecognizeButton.IsEnabled = true;
         ResultCard.IsVisible = false;
     }
@@ -97,15 +98,15 @@ public partial class MainPage : ContentPage
 
     private async void OnRecognizeClicked(object sender, EventArgs e)
     {
-        if (_photoStream == null) return;
+        if (_photoBytes == null) return;
 
         SetLoading(true);
         ResultCard.IsVisible = false;
 
         try
         {
-            _photoStream.Position = 0;
-            var result = await _apiService.RecognizeAsync(_photoStream, _photoFileName);
+            using var imageStream = new MemoryStream(_photoBytes);
+            var result = await _apiService.RecognizeAsync(imageStream, _photoFileName);
 
             if (result == null)
             {
@@ -113,7 +114,7 @@ public partial class MainPage : ContentPage
                 return;
             }
 
-            ResultTitleLabel.Text = result.Found ? "✅ Face Recognized" : "❌ Face Not Recognized";
+            ResultTitleLabel.Text = result.Found ? "Face Recognized" : "Face Not Recognized";
             ResultTitleLabel.TextColor = result.Found ? Color.FromArgb("#2e7d32") : Color.FromArgb("#f57f17");
             ResultNameLabel.Text = result.Person?.Name ?? "—";
             ResultConfidenceLabel.Text = result.Found ? $"{result.Confidence * 100:F1}%" : "—";
@@ -140,6 +141,6 @@ public partial class MainPage : ContentPage
     {
         LoadingIndicator.IsRunning = loading;
         LoadingIndicator.IsVisible = loading;
-        RecognizeButton.IsEnabled = !loading && _photoStream != null;
+        RecognizeButton.IsEnabled = !loading && _photoBytes != null;
     }
 }

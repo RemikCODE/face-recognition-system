@@ -22,11 +22,11 @@
                         <td>
                             @if (log.Found)
                             {
-                                <span class="badge bg-success">✅ Found</span>
+                                <span class="badge bg-success">Found</span>
                             }
                             else
                             {
-                                <span class="badge bg-warning text-dark">❌ Not found</span>
+                                <span class="badge bg-warning text-dark">Not found</span>
                             }
                         </td>
                         <td class="fw-semibold">@(string.IsNullOrEmpty(log.PersonName) ? "—" : log.PersonName)</td>

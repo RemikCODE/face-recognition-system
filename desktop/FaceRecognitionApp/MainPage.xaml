@@ -8,7 +8,7 @@
         <VerticalStackLayout Padding="24,20" Spacing="16">
 
             <!-- Title -->
-            <Label Text="🔍 Face Recognition"
+            <Label Text="Face Recognition"
                    FontSize="22"
                    FontAttributes="Bold"
                    HorizontalTextAlignment="Center" />
@@ -33,7 +33,7 @@
 
             <!-- Desktop: select file from disk -->
             <Button x:Name="SelectFileButton"
-                    Text="📁 Select File"
+                    Text="Select File"
                     Clicked="OnSelectFileClicked"
                     BackgroundColor="#333333"
                     TextColor="White"
@@ -44,7 +44,7 @@
 
             <!-- Mobile: take photo with camera -->
             <Button x:Name="TakePhotoButton"
-                    Text="📷 Take Photo"
+                    Text="Take Photo"
                     Clicked="OnTakePhotoClicked"
                     BackgroundColor="#333333"
                     TextColor="White"
