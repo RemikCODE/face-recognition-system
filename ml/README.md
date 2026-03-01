@@ -6,68 +6,6 @@ Przyjmuje zdjęcie twarzy i zwraca imię osoby.
 
 ---
 
-## ⚠ Przed instalacją na Windows – przeczytaj
-
-### Problem: błąd "Long Path" podczas `pip install`
-
-```
-ERROR: Could not install packages due to an OSError:
-HINT: This error might have occurred since this system does not have Windows Long Path support enabled.
-```
-
-TensorFlow ma bardzo zagnieżdżone ścieżki wewnętrzne, które przekraczają domyślny limit Windows (260 znaków).
-
-**Masz dwie opcje – wybierz jedną:**
-
----
-
-#### ✅ Opcja A – Włącz długie ścieżki (zalecane, wymaga admina, 1 komenda)
-
-Otwórz **CMD lub PowerShell jako Administrator** i wklej:
-
-```cmd
-reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f
-```
-
-Następnie **uruchom ponownie komputer** i wróć do normalnej instalacji:
-
-```cmd
-cd ml
-pip install -r requirements.txt
-python service.py
-```
-
----
-
-#### ✅ Opcja B – Użyj krótkiej ścieżki venv (bez admina)
-
-Kliknij dwa razy **`ml\setup-windows.bat`** – skrypt sam:
-1. Tworzy środowisko wirtualne w `C:\facerecog\venv` (krótka ścieżka)
-2. Instaluje wszystkie zależności
-3. Generuje `ml\run-windows.bat` do uruchamiania serwisu
-
-Potem zamiast `python service.py` używasz:
-```cmd
-run-windows.bat
-```
-
----
-
-### Problem: nieobsługiwana wersja Pythona
-
-Wymagany jest Python **3.10, 3.11, 3.12 lub 3.13**.
-
-Sprawdź wersję:
-```cmd
-python --version
-```
-
-Jeśli masz starszą wersję (np. 3.9 lub niższą), lub jeśli Python był zainstalowany ze **sklepu Microsoft Store**,  
-pobierz Python 3.13 lub 3.12 ze strony: **https://www.python.org/downloads/**  
-*(Podczas instalacji zaznacz "Add Python to PATH")*
-
----
-
 ## Jak to działa
 
 ```
@@ -87,22 +25,7 @@ DeepFace przy pierwszym wywołaniu automatycznie:
 
 ---
 
-## Uruchomienie (4 kroki)
-
-### Krok 0 – Pobierz dataset z Kaggle
-
-Dataset: **Face Recognition Dataset** by Vasuki Patel  
-🔗 **https://www.kaggle.com/datasets/vasukipatel/face-recognition-dataset**
-
-**Jak pobrać:**
-
-1. Otwórz powyższy link w przeglądarce
-2. Kliknij przycisk **Download** (prawy górny róg strony) → pobiera się plik `archive.zip`
-3. Zapisz go gdziekolwiek (np. `C:\Users\Ty\Downloads\archive.zip`)
-
-> ℹ Kaggle wymaga darmowego konta. Jeśli nie masz – zarejestruj się na https://www.kaggle.com
-
----
+## Uruchomienie (3 kroki)
 
 ### Krok 1 – Zainstaluj zależności
 
@@ -113,56 +36,43 @@ pip install -r requirements.txt
 
 > Pobiera TensorFlow + DeepFace – tylko raz, może chwilę potrwać (~600 MB).
 
----
+**Windows (problem z długimi ścieżkami):**
 
-### Krok 2 – Przygotuj folder z zdjęciami twarzy
-
-#### Masz pobrany plik `archive.zip`? → użyj gotowego skryptu
-
-Twoje archiwum ma taką strukturę:
-
-```
-archive.zip
-├── faces.csv                            ← plik CSV (id, label)
-├── Faces/
-│   └── Faces/                           ← ✅ TO JEST TEN FOLDER – przycięte twarze
-│       ├── Robert Downey Jr_87.jpg      (każda osoba ma kilkadziesiąt zdjęć)
-│       ├── Robert Downey Jr_23.jpg
-│       └── ...
-└── Original Images/
-    └── Original Images/                 ← ❌ NIE UŻYWAJ – zdjęcia całego ciała
-        ├── Robert Downey Jr/
-        │   └── ...
-        └── ...
-```
-
-**DeepFace potrzebuje tylko przyciętych twarzy** – czyli folderu `Faces/Faces/`.  
-Folder `Original Images/` możesz zignorować.
-
-**Jak skopiować zdjęcia do `ml/dataset/`:**
-
-**Opcja A – skrypt (zalecane):** Kliknij dwa razy `ml\prepare-dataset.bat` i podaj ścieżkę do ZIPa.  
-Albo z terminala:
+Jeśli pojawi się błąd `Could not install packages due to an OSError`, włącz obsługę długich ścieżek:
 
 ```cmd
-cd ml
-python prepare-dataset.py --zip C:\Users\Ty\Downloads\archive.zip
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f
 ```
 
-**Opcja B – ręcznie:**
-1. Rozpakuj `archive.zip`
-2. Wejdź do `archive\Faces\Faces\`
-3. Zaznacz wszystkie pliki (`Ctrl+A`) i skopiuj je do folderu `ml\dataset\`
+Następnie uruchom ponownie komputer i ponów instalację.  
+Alternatywnie kliknij dwa razy **`ml\setup-windows.bat`** – skrypt zainstaluje zależności w `C:\facerecog\venv`.
 
-Po skopiowaniu `ml/dataset/` powinien wyglądać tak:
+---
+
+### Krok 2 – Przygotuj folder ze zdjęciami twarzy
+
+1. Zgromadź zdjęcia twarzy (przycięte, jedna twarz na zdjęcie).
+2. Nazwij je według schematu: `ImięNazwisko_numer.jpg`  
+   np. `Jan Kowalski_1.jpg`, `Anna Nowak_2.png`
+3. Spakuj wszystkie zdjęcia do jednego pliku ZIP.
+4. Uruchom skrypt przygotowujący dataset:
+
+```bash
+cd ml
+python prepare-dataset.py --zip C:\sciezka\do\moje_twarze.zip
+```
+
+Lub kliknij dwa razy **`ml\prepare-dataset.bat`** i podaj ścieżkę do ZIPa.
+
+Po uruchomieniu folder `ml/dataset/` będzie wyglądał tak:
 
 ```
 ml/
 └── dataset/
-    ├── Robert Downey Jr_87.jpg
-    ├── Robert Downey Jr_23.jpg
-    ├── Scarlett Johansson_12.jpg
-    └── ...   (wszystkie ~2800 zdjęć płasko w jednym folderze)
+    ├── Jan Kowalski_1.jpg
+    ├── Jan Kowalski_2.jpg
+    ├── Anna Nowak_1.png
+    └── ...
 ```
 
 ---
@@ -208,7 +118,7 @@ curl -X POST http://localhost:5001/recognize \
 
 **Odpowiedź (znana twarz):**
 ```json
-{ "label": "Robert Downey Jr_87.jpg", "confidence": 0.87 }
+{ "label": "Jan Kowalski_1.jpg", "confidence": 0.87 }
 ```
 
 **Odpowiedź (nieznana twarz):**
@@ -235,7 +145,7 @@ curl http://localhost:5001/health
   "status": "ok",
   "dataset": "./dataset",
   "dataset_exists": true,
-  "images_in_dataset": 2800,
+  "images_in_dataset": 150,
   "model": "Facenet512"
 }
 ```
@@ -264,8 +174,8 @@ Możesz zmienić model w `service.py` (zmienna `MODEL_NAME`):
 
 | Model | Dokładność | Rozmiar |
 |-------|-----------|---------|
-| `Facenet512` ✅ | ⭐⭐⭐⭐ | ~90 MB |
-| `ArcFace` | ⭐⭐⭐⭐⭐ | ~130 MB |
-| `VGG-Face` | ⭐⭐⭐ | ~550 MB |
+| `Facenet512` | wysoka | ~90 MB |
+| `ArcFace` | bardzo wysoka | ~130 MB |
+| `VGG-Face` | średnia | ~550 MB |
 
 Domyślnie `Facenet512` – dobry kompromis.
