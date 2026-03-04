@@ -20,13 +20,19 @@
                ReturnType="Done"
                ReturnCommand="{Binding SaveCommand}" />
 
-        <Label Text="• Android emulator: use 10.0.2.2 instead of localhost"
+        <Label Text="• Enter only scheme + host + port – no path (e.g. http://localhost:5233)"
                FontSize="12"
                TextColor="Gray" />
-        <Label Text="• Real device: enter your PC's local network IP address"
+        <Label Text="• ❌ Wrong: http://localhost:5001/recognize  (that is the Python ML service, not the backend)"
                FontSize="12"
                TextColor="Gray" />
-        <Label Text="• Windows desktop: http://localhost:5233"
+        <Label Text="• ✅ Windows desktop: http://localhost:5233"
+               FontSize="12"
+               TextColor="Gray" />
+        <Label Text="• ✅ Android emulator: http://10.0.2.2:5233"
+               FontSize="12"
+               TextColor="Gray" />
+        <Label Text="• ✅ Real device: http://&lt;your-PC-LAN-IP&gt;:5233"
                FontSize="12"
                TextColor="Gray" />
 

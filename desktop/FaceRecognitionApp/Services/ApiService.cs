@@ -46,9 +46,25 @@ public class ApiService
 
     private void EnsureBaseAddress()
     {
-        var url = BaseUrl.TrimEnd('/') + "/";
-        if (_httpClient.BaseAddress?.ToString() != url)
-            _httpClient.BaseAddress = new Uri(url);
+        // Strip any path the user may have included (e.g. ".../recognize") so that
+        // the relative path "api/faces/recognize" is always resolved correctly.
+        var baseOnly = NormalizeBaseUrl(BaseUrl);
+        if (_httpClient.BaseAddress?.ToString() != baseOnly)
+            _httpClient.BaseAddress = new Uri(baseOnly);
+    }
+
+    /// <summary>
+    /// Returns only the scheme + authority (host + port) part of <paramref name="url"/>,
+    /// with a trailing slash. Any path component is intentionally discarded because
+    /// <see cref="RecognizeAsync"/> always appends the full API path itself.
+    /// </summary>
+    internal static string NormalizeBaseUrl(string url)
+    {
+        if (Uri.TryCreate(url.Trim(), UriKind.Absolute, out var parsed))
+            return parsed.GetLeftPart(UriPartial.Authority) + "/";
+
+        // Fallback: keep whatever was stored (will likely fail later with a clear error)
+        return url.TrimEnd('/') + "/";
     }
 
     /// <summary>
