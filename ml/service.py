@@ -15,6 +15,7 @@ Użycie:
 
 import argparse
 import os
+import socket
 import sys
 import tempfile
 from pathlib import Path
@@ -25,6 +26,7 @@ from flask_cors import CORS
 # ── Konfiguracja ─────────────────────────────────────────────────────────────
 DEFAULT_DATASET = Path(__file__).parent / "dataset"
 DEFAULT_PORT = 5001
+BACKEND_PORT = 5233  # port backendu ASP.NET (FaceRecognitionApi)
 
 # Model i metryka odległości
 MODEL_NAME = "Facenet512"   # gotowy, wytrenowany model – pobierany automatycznie (~90 MB)
@@ -135,6 +137,30 @@ def recognize():
                 pass
 
 
+def _get_lan_ips() -> list[str]:
+    """Return a list of non-loopback IPv4 addresses for the current machine."""
+    ips: list[str] = []
+    try:
+        # Connect to an external address (no data is sent) to discover the outbound IP
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            primary = s.getsockname()[0]
+            if primary and not primary.startswith("127."):
+                ips.append(primary)
+    except Exception:
+        pass
+    # Fallback: enumerate all addresses via getaddrinfo
+    try:
+        hostname = socket.gethostname()
+        for info in socket.getaddrinfo(hostname, None, socket.AF_INET):
+            addr = info[4][0]
+            if addr and not addr.startswith("127.") and addr not in ips:
+                ips.append(addr)
+    except Exception:
+        pass
+    return ips
+
+
 def main():
     global _dataset_path
 
@@ -161,9 +187,28 @@ def main():
         print(f"✅ Dataset: {_dataset_path} ({img_count} zdjęć)")
         print(f"   Model:   {MODEL_NAME} (gotowy, wytrenowany – pobierany automatycznie przy pierwszym użyciu)")
 
+    lan_ips = _get_lan_ips()
+
     print(f"\n🚀 Serwis startuje na http://{args.host}:{args.port}")
-    print(f"   POST http://localhost:{args.port}/recognize  <- wyslij zdjecie twarzy")
-    print(f"   GET  http://localhost:{args.port}/health     <- diagnostyka\n")
+    print(f"   POST http://localhost:{args.port}/recognize  <- wyslij zdjecie twarzy (backend)")
+    print(f"   GET  http://localhost:{args.port}/health     <- diagnostyka")
+
+    # Detect and display LAN IP addresses when listening on all interfaces
+    if args.host in ("0.0.0.0", "::") and lan_ips:
+        print(f"\n   Adresy sieciowe (dostępne z innych urządzeń w sieci):")
+        for ip in lan_ips:
+            print(f"      http://{ip}:{args.port}/recognize")
+
+    print(f"\n💡 Aplikacja desktop/mobilna (MAUI) łączy się z backendem ASP.NET, nie z tym serwisem!")
+    print(f"   W aplikacji (zakładka Settings) ustaw URL backendu:")
+    print(f"      Windows desktop:      http://localhost:{BACKEND_PORT}")
+    print(f"      Emulator Android:     http://10.0.2.2:{BACKEND_PORT}")
+    if lan_ips:
+        for ip in lan_ips:
+            print(f"      Fizyczne urządzenie:  http://{ip}:{BACKEND_PORT}")
+    else:
+        print(f"      Fizyczne urządzenie:  http://<IP-komputera>:{BACKEND_PORT}")
+    print()
 
     app.run(host=args.host, port=args.port, debug=False)
 
