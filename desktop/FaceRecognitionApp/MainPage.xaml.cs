@@ -115,10 +115,10 @@ public partial class MainPage : ContentPage
                 return;
             }
 
-            ResultStatusLabel.Text = result.Found ? "✅  Face Recognized" : "❌  Face Not Recognized";
+            ResultStatusLabel.Text = result.Found ? "Face Recognized" : "Not Recognized";
             ResultStatusLabel.TextColor = result.Found
-                ? Color.FromArgb("#2E7D32")
-                : Color.FromArgb("#B71C1C");
+                ? Color.FromArgb("#3FB950")
+                : Color.FromArgb("#F85149");
             ResultNameLabel.Text = result.Person?.Name ?? "—";
             ResultConfidenceLabel.Text = result.Found ? $"{result.Confidence * 100:F1}%" : "—";
             ResultMessageLabel.Text = result.Message;
