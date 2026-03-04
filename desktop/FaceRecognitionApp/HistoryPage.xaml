@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="FaceRecognitionApp.HistoryPage"
              Title="History"
-             BackgroundColor="{StaticResource PageBg}">
+             BackgroundColor="{DynamicResource PageBg}">
 
     <Grid RowDefinitions="Auto,*">
 
