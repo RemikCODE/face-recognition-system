@@ -18,10 +18,15 @@ Zdjęcie (JPG/PNG)
   Najlepsze dopasowanie  → zwróć label + confidence
 ```
 
-DeepFace przy pierwszym wywołaniu automatycznie:
+DeepFace przy **pierwszym** uruchomieniu automatycznie:
 1. Pobiera wagi modelu Facenet512 (~90 MB) z internetu
 2. Oblicza reprezentacje wszystkich zdjęć z datasetu i zapisuje je w pliku `.pkl` (cache)
-3. Kolejne zapytania są szybkie – cache jest odczytywany z dysku
+
+**Od drugiego uruchomienia** serwis jest gotowy w kilkanaście sekund – model i embeddingi
+ładują się z cache.
+
+> **Warmup:** po uruchomieniu serwis od razu odpowiada na `/health`, ale `/recognize`
+> zwróci `503` dopóki model nie zostanie załadowany do pamięci. Postęp widać w konsoli.
 
 ---
 
@@ -54,17 +59,7 @@ Alternatywnie kliknij dwa razy **`ml\setup-windows.bat`** – skrypt zainstaluje
 1. Zgromadź zdjęcia twarzy (przycięte, jedna twarz na zdjęcie).
 2. Nazwij je według schematu: `ImięNazwisko_numer.jpg`  
    np. `Jan Kowalski_1.jpg`, `Anna Nowak_2.png`
-3. Spakuj wszystkie zdjęcia do jednego pliku ZIP.
-4. Uruchom skrypt przygotowujący dataset:
-
-```bash
-cd ml
-python prepare-dataset.py --zip C:\sciezka\do\moje_twarze.zip
-```
-
-Lub kliknij dwa razy **`ml\prepare-dataset.bat`** i podaj ścieżkę do ZIPa.
-
-Po uruchomieniu folder `ml/dataset/` będzie wyglądał tak:
+3. Skopiuj zdjęcia do folderu `ml/dataset/`:
 
 ```
 ml/
@@ -86,8 +81,16 @@ python service.py
 
 Serwis startuje na **`http://localhost:5001`**.
 
-Przy pierwszym zapytaniu DeepFace automatycznie obliczy reprezentacje zdjęć  
-(może potrwać chwilę przy dużym datasecie – tylko raz, później jest cache).
+```
+⏳ [Warmup] Wczytywanie TensorFlow i modelu Facenet512…
+   (pierwsze uruchomienie może potrwać kilka minut – pobieranie wag ~90 MB)
+✅ [Warmup] Model wczytany (45.2 s)
+⏳ [Warmup] Budowanie bazy embeddingów (12 zdjęć)…
+✅ [Warmup] Baza embeddingów gotowa (8.3 s)
+🚀 [Warmup] Serwis gotowy do pracy! (łączny czas: 53.5 s)
+```
+
+Od drugiego uruchomienia model i embeddingi ładują się z cache – typowo **10-20 s**.
 
 ---
 
@@ -121,16 +124,16 @@ curl -X POST http://localhost:5001/recognize \
 { "label": "Jan Kowalski_1.jpg", "confidence": 0.87 }
 ```
 
-**Odpowiedź (nieznana twarz):**
+**Odpowiedź (nieznana twarz / brak twarzy):**
 ```json
 { "label": "", "confidence": 0.0 }
 ```
 
-**Odpowiedź (brak twarzy na zdjęciu):**
+**Odpowiedź (model jeszcze się wczytuje):**
 ```json
-{ "error": "Nie wykryto twarzy na zdjęciu: ..." }
+{ "error": "Serwis się jeszcze uruchamia (wczytywanie modelu, 12.3 s). Poczekaj chwilę i spróbuj ponownie." }
 ```
-HTTP status: `422`
+HTTP status: `503`
 
 ---
 
@@ -143,12 +146,17 @@ curl http://localhost:5001/health
 ```json
 {
   "status": "ok",
+  "model_ready": true,
+  "warmup_error": null,
+  "warmup_elapsed_s": 53.5,
   "dataset": "./dataset",
   "dataset_exists": true,
-  "images_in_dataset": 150,
+  "images_in_dataset": 12,
   "model": "Facenet512"
 }
 ```
+
+`status` przyjmuje wartości: `"loading"` | `"ok"` | `"error"`
 
 ---
 
@@ -178,4 +186,4 @@ Możesz zmienić model w `service.py` (zmienna `MODEL_NAME`):
 | `ArcFace` | bardzo wysoka | ~130 MB |
 | `VGG-Face` | średnia | ~550 MB |
 
-Domyślnie `Facenet512` – dobry kompromis.
+Domyślnie `Facenet512` – dobry kompromis między dokładnością a szybkością.

@@ -24,7 +24,7 @@ public static class MauiProgram
 
         // Pages (registered for DI constructor injection)
         builder.Services.AddTransient<MainPage>();
-        builder.Services.AddTransient<SettingsPage>();
+        builder.Services.AddTransient<HistoryPage>();
         builder.Services.AddTransient<AppShell>();
 
 #if DEBUG

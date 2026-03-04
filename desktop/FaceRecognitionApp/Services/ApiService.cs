@@ -6,49 +6,31 @@ namespace FaceRecognitionApp.Services;
 
 /// <summary>
 /// HTTP client that communicates with the ASP.NET backend.
-/// The base URL is persisted in device Preferences so users can change it
-/// from the Settings page without rebuilding the app.
+/// The backend URL is fixed in code. To use a different host (e.g. a physical device
+/// on the same network), change <see cref="BackendBaseUrl"/> and rebuild.
 /// </summary>
 public class ApiService
 {
     private readonly HttpClient _httpClient;
 
-    private const string BaseUrlKey = "ApiBaseUrl";
-
-    /// <summary>
-    /// Default base URL:
-    ///   – http://localhost:5233 when running the Windows desktop build.
-    ///   – 10.0.2.2  resolves to the host machine's localhost inside the Android emulator.
-    ///   – Use the host machine's LAN IP when running on a real physical device.
-    /// </summary>
+    // Fixed backend URL – no runtime Settings page.
+    // Windows / macOS desktop: backend runs on the same machine.
+    // Android emulator:        10.0.2.2 maps to the host's localhost.
+    // Real physical device:    change to your PC's LAN IP and rebuild, e.g. "http://192.168.1.42:5233/"
 #if WINDOWS || MACCATALYST
-    private const string DefaultBaseUrl = "http://localhost:5233";
+    private const string BackendBaseUrl = "http://localhost:5233/";
 #else
-    private const string DefaultBaseUrl = "http://10.0.2.2:5233";
+    private const string BackendBaseUrl = "http://10.0.2.2:5233/";
 #endif
+
+    // DeepFace inference can be slow – allow up to 10 minutes.
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromMinutes(10);
 
     public ApiService(HttpClient httpClient)
     {
         _httpClient = httpClient;
-        EnsureBaseAddress();
-    }
-
-    /// <summary>Gets or sets the backend base URL, persisted across app restarts.</summary>
-    public string BaseUrl
-    {
-        get => Preferences.Default.Get(BaseUrlKey, DefaultBaseUrl);
-        set
-        {
-            Preferences.Default.Set(BaseUrlKey, value);
-            EnsureBaseAddress();
-        }
-    }
-
-    private void EnsureBaseAddress()
-    {
-        var url = BaseUrl.TrimEnd('/') + "/";
-        if (_httpClient.BaseAddress?.ToString() != url)
-            _httpClient.BaseAddress = new Uri(url);
+        _httpClient.BaseAddress = new Uri(BackendBaseUrl);
+        _httpClient.Timeout = RequestTimeout;
     }
 
     /// <summary>
@@ -56,8 +38,6 @@ public class ApiService
     /// </summary>
     public async Task<RecognitionResult?> RecognizeAsync(Stream imageStream, string fileName)
     {
-        EnsureBaseAddress();
-
         using var form = new MultipartFormDataContent();
         var imgContent = new StreamContent(imageStream);
         imgContent.Headers.ContentType = new MediaTypeHeaderValue(GetMimeType(fileName));
@@ -69,6 +49,17 @@ public class ApiService
         var json = await response.Content.ReadAsStringAsync();
         return JsonSerializer.Deserialize<RecognitionResult>(json,
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+    }
+
+    /// <summary>
+    /// Returns recent recognition log entries from GET /api/recognitions.
+    /// This is the same data shown on the backend web dashboard.
+    /// </summary>
+    public async Task<List<RecognitionLog>> GetRecentLogsAsync(int limit = 20)
+    {
+        var json = await _httpClient.GetStringAsync($"api/recognitions?limit={limit}");
+        return JsonSerializer.Deserialize<List<RecognitionLog>>(json,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
     }
 
     private static string GetMimeType(string fileName) =>
