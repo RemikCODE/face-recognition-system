@@ -9,7 +9,7 @@
     <span class="badge bg-secondary fs-6" id="totalBadge">@Model.Logs.Count records</span>
 </div>
 
-<p class="text-muted small mb-4">
+<p class="small mb-4" style="color: var(--bs-secondary-color)">
     Results appear here automatically whenever the mobile or desktop app sends a photo.
     The page refreshes every 5 seconds.
 </p>
@@ -41,14 +41,14 @@
                 const dt = new Date(l.recognizedAt + 'Z').toLocaleString();
                 const badge = l.found
                     ? `<span class="badge bg-success">Found</span>`
-                    : `<span class="badge bg-warning text-dark">Not found</span>`;
+                    : `<span class="badge bg-warning">Not found</span>`;
                 const conf = l.found ? `${(l.confidence * 100).toFixed(1)}%` : '—';
                 return `<tr>
                     <td class="text-muted small">${dt}</td>
                     <td>${badge}</td>
                     <td class="fw-semibold">${l.personName || '—'}</td>
                     <td>${conf}</td>
-                    <td class="text-muted small">${l.message}</td>
+                    <td class="small" style="color:var(--bs-secondary-color)">${l.message}</td>
                 </tr>`;
             }).join('');
         } catch (e) { /* ignore network errors during polling */ }

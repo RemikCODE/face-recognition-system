@@ -1,7 +1,7 @@
 """
 service.py – serwis HTTP do rozpoznawania twarzy.
 
-Używa gotowych, wytrenowanych modeli DeepFace (Facenet512).
+Używa gotowych, wytrenowanych modeli DeepFace (Facenet).
 Nie wymaga żadnego trenowania – wystarczy podać folder ze zdjęciami referencyjnymi.
 
 Nasłuchuje na porcie 5001.
@@ -11,6 +11,11 @@ Zwraca JSON: { "label": "Robert Downey Jr_87.jpg", "confidence": 0.92 }
 Użycie:
     python service.py
     python service.py --dataset ./dataset --port 5001
+
+Dla dużych datasetów (>200 zdjęć) zalecane jest wstępne zbudowanie bazy embeddingów:
+    python service.py --build-db
+    python service.py --build-db --dataset ./dataset
+Po zbudowaniu bazy serwis startuje w ~30 s (wczytanie modelu + cache).
 """
 
 import argparse
@@ -31,9 +36,16 @@ DEFAULT_PORT = 5001
 BACKEND_PORT = 5233  # port backendu ASP.NET (FaceRecognitionApi)
 
 # Model i metryka odległości
-MODEL_NAME = "Facenet512"   # gotowy, wytrenowany model – pobierany automatycznie (~90 MB)
+MODEL_NAME = "Facenet"      # gotowy, wytrenowany model – pobierany automatycznie (~93 MB)
+                            # Facenet (128-dim) jest ~2x szybszy od Facenet512 (512-dim)
+                            # przy porównywalnej dokładności na małych datasetach.
 DETECTOR = "opencv"         # najszybszy detektor twarzy
 DISTANCE_METRIC = "cosine"
+
+# Szacowany czas obliczenia embeddingu jednego zdjęcia na CPU (sekundy).
+# Używany do informacyjnych komunikatów o oczekiwanym czasie budowania bazy.
+# Na GPU czas jest 5-10× krótszy.
+_SECONDS_PER_IMAGE = 0.8
 
 # ── Stan serwisu ──────────────────────────────────────────────────────────────
 # Globalna ścieżka do datasetu (ustawiana przy starcie)
@@ -42,8 +54,18 @@ _dataset_path: str | None = None
 # Moduł DeepFace – wczytywany raz w tle, trzymany w pamięci
 _deepface = None
 
-# Flaga gotowości: True gdy model + embeddingi są gotowe
+# Flaga gotowości modelu (faza 1): True gdy TF + wagi Facenet są w pamięci.
+# Ustawiana PRZED budowaniem bazy embeddingów – serwis odpowiada na /health
+# natychmiast po wczytaniu modelu (~30-60 s).
 _model_ready = False
+
+# Flaga gotowości bazy embeddingów (faza 2): True gdy plik .pkl jest gotowy.
+# Dla dużych datasetów (tysiące zdjęć) może trwać wiele minut / godzin.
+# Użyj --build-db aby zbudować bazę jednorazowo z wyprzedzeniem.
+_embeddings_ready = False
+
+# Łączna liczba zdjęć w datasecie (do informacyjnych komunikatów).
+_embeddings_total: int = 0
 
 # Ew. komunikat o błędzie podczas warmup
 _warmup_error: str | None = None
@@ -59,25 +81,66 @@ app = Flask(__name__)
 CORS(app)  # pozwala na zapytania z ASP.NET / przeglądarki
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _get_pkl_path(dataset_path: str) -> Path:
+    """
+    Returns the expected path of the DeepFace embedding cache (.pkl) for the
+    current MODEL_NAME / DETECTOR / align=True configuration.
+
+    DeepFace names the file:
+        ds_model_{model}_detector_{detector}_aligned_{align}.pkl
+    """
+    name = f"ds_model_{MODEL_NAME}_detector_{DETECTOR}_aligned_True.pkl"
+    return Path(dataset_path) / name
+
+
+def _estimate_build_minutes(n_images: int) -> int:
+    """
+    Rough estimate of .pkl build time on a mid-range CPU.
+    Based on ~0.8 s per image (face detection + Facenet embedding).
+    Actual time depends heavily on hardware; GPU is 5-10× faster.
+    """
+    return max(1, round(n_images * _SECONDS_PER_IMAGE / 60))
+
+
+def _check_pkl(dataset_path: str, img_count: int) -> tuple[bool, int]:
+    """
+    Returns (pkl_exists, estimated_build_minutes) for the current dataset.
+    Centralises the .pkl existence check used both at startup and in _warmup().
+    """
+    exists = _get_pkl_path(dataset_path).exists()
+    est = _estimate_build_minutes(img_count) if not exists and img_count > 0 else 0
+    return exists, est
+
+
 # ── Warmup ────────────────────────────────────────────────────────────────────
 
 def _warmup() -> None:
     """
     Uruchamiana w tle zaraz po starcie serwisu.
 
-    1. Importuje DeepFace + TensorFlow (ciężki import, ~15-60 s przy pierwszym uruchomieniu).
-    2. Wczytuje wagi modelu Facenet512 do pamięci.
-    3. Buduje / odczytuje plik .pkl z embeddingami datasetu
-       (wolne tylko raz – kolejne starty korzystają z cache).
+    Faza 1 – wczytywanie modelu (~30-60 s na pierwszym uruchomieniu):
+        Importuje DeepFace + TensorFlow i ładuje wagi Facenet do pamięci.
+        Po zakończeniu ustawia _model_ready = True – serwis natychmiast
+        odpowiada na /health i przyjmuje żądania /recognize.
 
-    Po zakończeniu ustawia _model_ready = True – serwis jest gotowy do pracy.
+    Faza 2 – budowanie / ładowanie bazy embeddingów:
+        Jeśli plik .pkl już istnieje (wynik poprzedniego uruchomienia),
+        faza ta kończy się w ułamku sekundy.
+        Jeśli .pkl nie istnieje, DeepFace oblicza embeddingi dla KAŻDEGO zdjęcia
+        w datasecie i zapisuje wynik. Czas: ~0.8 s × liczba_zdjęć na CPU.
+        Dla 5000 zdjęć to ~67 minut – dlatego dla dużych datasetów zaleca się
+        wstępne zbudowanie bazy komendą:
+            python service.py --build-db
+        Po zbudowaniu każde kolejne uruchomienie serwisu będzie szybkie (~30 s).
     """
-    global _deepface, _model_ready, _warmup_error
+    global _deepface, _model_ready, _warmup_error, _embeddings_ready, _embeddings_total
 
     try:
-        # ── krok 1: import TF + model ───────────────────────────────────────
-        print("⏳ [Warmup] Wczytywanie TensorFlow i modelu Facenet512…")
-        print("   (pierwsze uruchomienie może potrwać kilka minut – pobieranie wag ~90 MB)")
+        # ── Faza 1: import TF + wagi modelu ──────────────────────────────────
+        print("⏳ [Warmup] Wczytywanie TensorFlow i modelu Facenet…")
+        print("   (pierwsze uruchomienie może potrwać kilkanaście sekund – pobieranie wag ~93 MB)")
         t0 = time.time()
 
         from deepface import DeepFace  # noqa: C0415  (intentional deferred import)
@@ -89,42 +152,69 @@ def _warmup() -> None:
         elapsed = time.time() - t0
         print(f"✅ [Warmup] Model wczytany ({elapsed:.1f} s)")
 
-        # ── krok 2: zbuduj / wczytaj embeddingi datasetu ─────────────────────
+        # Ustaw _model_ready JUŻ TERAZ – serwis odpowiada na zapytania.
+        # Rozpoznawanie twarzy będzie dostępne po zakończeniu fazy 2 (_embeddings_ready).
+        _model_ready = True
+
+        # ── Faza 2: zbuduj / wczytaj embeddingi datasetu ─────────────────────
         if _dataset_path and Path(_dataset_path).exists():
             imgs = sorted(
                 f for f in Path(_dataset_path).rglob("*")
                 if f.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp"}
             )
-            if imgs:
-                print(f"⏳ [Warmup] Budowanie bazy embeddingów ({len(imgs)} zdjęć)…")
-                print("   (wolne tylko raz – wynik zapisywany w dataset/*.pkl)")
-                t1 = time.time()
-                try:
-                    # Wywołanie z prawdziwym zdjęciem z datasetu jako query –
-                    # to wymusza zbudowanie/odczytanie pliku .pkl dla WSZYSTKICH zdjęć.
-                    # enforce_detection=False: jeśli wzorzec-zdjęcie nie ma wyraźnej
-                    # twarzy, po prostu pomijamy błąd.
-                    DeepFace.find(
-                        img_path=str(imgs[0]),
-                        db_path=str(_dataset_path),
-                        model_name=MODEL_NAME,
-                        distance_metric=DISTANCE_METRIC,
-                        detector_backend=DETECTOR,
-                        enforce_detection=False,
-                        align=True,
-                        silent=True,
-                    )
-                    elapsed2 = time.time() - t1
-                    print(f"✅ [Warmup] Baza embeddingów gotowa ({elapsed2:.1f} s)")
-                except Exception as emb_err:
-                    # Nie fatal – .pkl zostanie zbudowany przy pierwszym prawdziwym zapytaniu.
-                    print(f"⚠  [Warmup] Nie udało się wstępnie zbudować embeddingów: {emb_err}")
+            _embeddings_total = len(imgs)
+
+            if not imgs:
+                print("ℹ  [Embeddings] Dataset jest pusty – embeddingi zostaną zbudowane po dodaniu zdjęć.")
+                _embeddings_ready = True
             else:
-                print("ℹ  [Warmup] Dataset jest pusty – embeddingi zostaną zbudowane po dodaniu zdjęć.")
+                pkl = _get_pkl_path(_dataset_path)
+                pkl_exists, est = _check_pkl(_dataset_path, _embeddings_total)
+
+                if pkl_exists:
+                    # Cache z poprzedniego uruchomienia – wczytanie jest błyskawiczne.
+                    print(f"✅ [Embeddings] Wczytano bazę embeddingów z cache ({pkl.name})")
+                    _embeddings_ready = True
+                else:
+                    # Plik .pkl nie istnieje – trzeba go zbudować od zera.
+                    print(f"⏳ [Embeddings] Budowanie bazy embeddingów ({_embeddings_total} zdjęć)…")
+                    print(f"   Szacowany czas: ~{est} min. Wynik zostanie zapisany jako {pkl.name}.")
+
+                    if _embeddings_total > 200:
+                        print(
+                            f"\n   ⚠  Duży dataset ({_embeddings_total} zdjęć). Następnym razem"
+                            f" zbuduj bazę z wyprzedzeniem:\n      python service.py --build-db\n"
+                            f"   i pozostaw działający w tle."
+                            f" Po zakończeniu każde kolejne uruchomienie zajmie ~30 s.\n"
+                        )
+
+                    t1 = time.time()
+                    try:
+                        # Wywołanie z prawdziwym zdjęciem z datasetu jako query –
+                        # to wymusza zbudowanie/odczytanie pliku .pkl dla WSZYSTKICH zdjęć.
+                        # enforce_detection=False: jeśli wzorzec-zdjęcie nie ma wyraźnej
+                        # twarzy, po prostu pomijamy błąd.
+                        DeepFace.find(
+                            img_path=str(imgs[0]),
+                            db_path=str(_dataset_path),
+                            model_name=MODEL_NAME,
+                            distance_metric=DISTANCE_METRIC,
+                            detector_backend=DETECTOR,
+                            enforce_detection=False,
+                            align=True,
+                            silent=True,
+                        )
+                        elapsed2 = time.time() - t1
+                        print(f"✅ [Embeddings] Baza embeddingów gotowa ({elapsed2:.1f} s)")
+                    except Exception as emb_err:
+                        # Nie fatal – .pkl zostanie zbudowany przy pierwszym prawdziwym zapytaniu.
+                        print(f"⚠  [Embeddings] Nie udało się wstępnie zbudować embeddingów: {emb_err}")
+
+                    _embeddings_ready = True
         else:
             print("ℹ  [Warmup] Brak datasetu – embeddingi zostaną zbudowane po uruchomieniu z --dataset.")
+            _embeddings_ready = True
 
-        _model_ready = True
         total = time.time() - _warmup_start
         print(f"\n🚀 [Warmup] Serwis gotowy do pracy! (łączny czas: {total:.1f} s)\n")
 
@@ -145,12 +235,20 @@ def health():
         count = sum(1 for f in Path(_dataset_path).rglob("*")
                     if f.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp"})
 
-    status = "ok" if _model_ready else ("error" if _warmup_error else "loading")
+    if not _model_ready:
+        status = "error" if _warmup_error else "loading"
+    elif not _embeddings_ready:
+        status = "building_embeddings"
+    else:
+        status = "ok"
+
     elapsed = round(time.time() - _warmup_start, 1) if _warmup_start else 0
 
     return jsonify({
         "status": status,
         "model_ready": _model_ready,
+        "embeddings_ready": _embeddings_ready,
+        "embeddings_total": _embeddings_total,
         "warmup_error": _warmup_error,
         "warmup_elapsed_s": elapsed,
         "dataset": str(_dataset_path),
@@ -165,7 +263,7 @@ def recognize():
     """
     Przyjmuje zdjęcie twarzy i zwraca nazwę osoby.
 
-    Używa gotowego modelu Facenet512 (DeepFace) do porównania twarzy
+    Używa gotowego modelu Facenet (DeepFace) do porównania twarzy
     ze zdjęciami w folderze dataset/.
 
     Request:  POST multipart/form-data, pole 'image'
@@ -182,6 +280,23 @@ def recognize():
         return jsonify({
             "error": f"Serwis się jeszcze uruchamia (wczytywanie modelu, {elapsed} s)."
                      " Poczekaj chwilę i spróbuj ponownie."
+        }), 503
+
+    # ── sprawdź gotowość bazy embeddingów ────────────────────────────────────
+    if not _embeddings_ready:
+        elapsed = round(time.time() - _warmup_start, 1) if _warmup_start else 0
+        est = _estimate_build_minutes(_embeddings_total) if _embeddings_total > 0 else 1
+        tip = (
+            f" Dla dużego datasetu ({_embeddings_total} zdjęć) uruchom wcześniej:"
+            f" python service.py --build-db i pozostaw działający w tle."
+            f" Kolejne starty serwisu będą szybkie (~30 s)."
+            if _embeddings_total > 200 else ""
+        )
+        return jsonify({
+            "error": (
+                f"Baza embeddingów jest jeszcze budowana"
+                f" ({elapsed} s, szacowany czas: ~{est} min).{tip}"
+            )
         }), 503
 
     # ── walidacja datasetu ───────────────────────────────────────────────────
@@ -271,11 +386,74 @@ def _get_lan_ips() -> list[str]:
     return ips
 
 
+def _build_db_only(dataset_path: str) -> None:
+    """
+    Jednorazowy tryb offline: buduje bazę embeddingów (.pkl) i kończy działanie.
+    Nie uruchamia serwisu HTTP.
+
+    Przeznaczony dla dużych datasetów (setki / tysiące zdjęć), gdzie budowanie bazy
+    podczas normalnego startu serwisu trwałoby zbyt długo. Uruchom raz (np. przez noc),
+    a każde kolejne uruchomienie 'python service.py' zajmie tylko ~30 s.
+    """
+    dataset = Path(dataset_path)
+    if not dataset.exists():
+        print(f"❌ Folder datasetu nie istnieje: {dataset_path}")
+        sys.exit(1)
+
+    imgs = sorted(
+        f for f in dataset.rglob("*")
+        if f.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp"}
+    )
+    if not imgs:
+        print(f"⚠  Brak zdjęć w folderze: {dataset_path}")
+        sys.exit(0)
+
+    pkl = _get_pkl_path(dataset_path)
+    if pkl.exists():
+        print(f"✅ Baza embeddingów już istnieje: {pkl}")
+        print("   Usuń plik .pkl jeśli chcesz przebudować bazę od zera.")
+        sys.exit(0)
+
+    est = _estimate_build_minutes(len(imgs))
+    print(f"⏳ Budowanie bazy embeddingów dla {len(imgs)} zdjęć (~{est} min)…")
+    print(f"   Model:   {MODEL_NAME} | Detektor: {DETECTOR}")
+    print(f"   Wynik:   {pkl}")
+    print("   Zostaw uruchomiony i wróć po zakończeniu.\n")
+
+    t0 = time.time()
+    from deepface import DeepFace  # noqa: C0415
+    print("   Wczytywanie modelu…")
+    DeepFace.build_model(MODEL_NAME)
+    print("   Model wczytany. Przetwarzanie zdjęć (postęp pokazywany poniżej):\n")
+
+    try:
+        DeepFace.find(
+            img_path=str(imgs[0]),
+            db_path=str(dataset),
+            model_name=MODEL_NAME,
+            distance_metric=DISTANCE_METRIC,
+            detector_backend=DETECTOR,
+            enforce_detection=False,
+            align=True,
+            silent=False,   # pokazuj pasek postępu tqdm
+        )
+    except Exception as exc:
+        print(f"\n❌ Błąd podczas budowania bazy: {exc}")
+        sys.exit(1)
+
+    elapsed = time.time() - t0
+    print(f"\n✅ Baza embeddingów zbudowana w {elapsed:.0f} s ({elapsed / 60:.1f} min).")
+    print(f"   Plik: {pkl}")
+    print(f"\n   Teraz uruchom serwis normalnie:")
+    print(f"      python service.py --dataset {dataset_path}")
+    print("   Serwis będzie gotowy do pracy w ~30 s.\n")
+
+
 def main():
     global _dataset_path, _warmup_start
 
     parser = argparse.ArgumentParser(
-        description="Serwis rozpoznawania twarzy (gotowy model Facenet512, bez trenowania)"
+        description="Serwis rozpoznawania twarzy (gotowy model Facenet, bez trenowania)"
     )
     parser.add_argument("--dataset", default=str(DEFAULT_DATASET),
                         help=f"Folder z referencyjnymi zdjęciami twarzy (domyslnie: {DEFAULT_DATASET})")
@@ -283,7 +461,19 @@ def main():
                         help=f"Port HTTP (domyslnie: {DEFAULT_PORT})")
     parser.add_argument("--host", default="0.0.0.0",
                         help="Adres nasluchiwania (domyslnie: 0.0.0.0)")
+    parser.add_argument(
+        "--build-db", action="store_true",
+        help=(
+            "Buduje bazę embeddingów (.pkl) dla datasetu i kończy działanie. "
+            "Zalecane dla dużych datasetów (>200 zdjęć) – uruchom raz przed normalnym startem serwisu."
+        ),
+    )
     args = parser.parse_args()
+
+    # ── tryb --build-db: zbuduj .pkl i zakończ ──────────────────────────────
+    if args.build_db:
+        _build_db_only(args.dataset)
+        return
 
     _dataset_path = args.dataset
 
@@ -295,6 +485,12 @@ def main():
         img_count = sum(1 for f in Path(_dataset_path).rglob("*")
                         if f.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp"})
         print(f"✅ Dataset: {_dataset_path} ({img_count} zdjęć)")
+        if img_count > 200:
+            pkl_exists, est = _check_pkl(_dataset_path, img_count)
+            if not pkl_exists:
+                print(f"\n   ⚠  Duży dataset bez pliku .pkl – budowanie bazy zajmie ~{est} min.")
+                print(f"   💡 Aby uniknąć długiego oczekiwania, uruchom wcześniej:")
+                print(f"      python service.py --build-db --dataset {_dataset_path}\n")
 
     lan_ips = _get_lan_ips()
 
@@ -318,7 +514,7 @@ def main():
         print(f"      Fizyczne urządzenie:  http://<IP-komputera>:{BACKEND_PORT}")
 
     print("\n⏳ Model wczytuje się w tle – serwis odpowiada na /health natychmiast,")
-    print("   a na /recognize dopiero gdy model będzie gotowy (patrz logi).\n")
+    print("   a na /recognize dopiero gdy model i baza embeddingów będą gotowe (patrz logi).\n")
 
     # ── uruchom warmup w tle PRZED startem Flask ──────────────────────────────
     _warmup_start = time.time()

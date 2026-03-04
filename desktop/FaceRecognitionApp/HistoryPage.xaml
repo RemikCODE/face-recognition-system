@@ -3,35 +3,44 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="FaceRecognitionApp.HistoryPage"
              Title="History"
-             BackgroundColor="#F5F5F5">
+             BackgroundColor="{StaticResource PageBg}">
 
     <Grid RowDefinitions="Auto,*">
 
         <!-- ── Header ── -->
         <Grid Grid.Row="0"
               ColumnDefinitions="*,Auto"
-              BackgroundColor="#1565C0"
-              Padding="20,24,16,20">
+              BackgroundColor="{StaticResource Surface}"
+              Padding="20,28,16,20">
             <VerticalStackLayout Grid.Column="0" Spacing="4">
                 <Label Text="Recognition History"
-                       FontSize="22"
+                       FontSize="20"
                        FontAttributes="Bold"
-                       TextColor="White" />
+                       TextColor="{StaticResource TextPrimary}"
+                       CharacterSpacing="0.3" />
                 <Label Text="Results fetched from the backend"
                        FontSize="13"
-                       TextColor="#BBDEFB" />
+                       TextColor="{StaticResource TextSecondary}" />
             </VerticalStackLayout>
             <Button Grid.Column="1"
                     x:Name="RefreshButton"
-                    Text="↻"
-                    FontSize="20"
-                    TextColor="White"
-                    BackgroundColor="Transparent"
+                    Text="Refresh"
+                    FontSize="13"
+                    TextColor="{StaticResource TextPrimary}"
+                    BackgroundColor="{StaticResource SurfaceElev}"
+                    BorderColor="{StaticResource BorderColor}"
+                    BorderWidth="1"
+                    CornerRadius="8"
                     Clicked="OnRefreshClicked"
                     VerticalOptions="Center"
-                    WidthRequest="44"
-                    HeightRequest="44" />
+                    HeightRequest="36"
+                    Padding="12,0" />
+            <!-- bottom border -->
         </Grid>
+        <BoxView Grid.Row="0"
+                 HeightRequest="1"
+                 VerticalOptions="End"
+                 Color="{StaticResource BorderColor}" />
 
         <!-- ── Content ── -->
         <Grid Grid.Row="1">
@@ -43,11 +52,11 @@
                                  HorizontalOptions="Center"
                                  Spacing="12">
                 <ActivityIndicator IsRunning="True"
-                                   Color="#1565C0"
+                                   Color="{StaticResource Accent}"
                                    HorizontalOptions="Center" />
-                <Label Text="Loading…"
+                <Label Text="Loading..."
                        FontSize="14"
-                       TextColor="#9E9E9E"
+                       TextColor="{StaticResource TextSecondary}"
                        HorizontalTextAlignment="Center" />
             </VerticalStackLayout>
 
@@ -57,13 +66,21 @@
                                  VerticalOptions="Center"
                                  HorizontalOptions="Center"
                                  Padding="32"
-                                 Spacing="12">
-                <Label Text="⚠️"
-                       FontSize="48"
-                       HorizontalTextAlignment="Center" />
+                                 Spacing="10">
+                <Border StrokeShape="RoundRectangle 6"
+                        Stroke="{StaticResource ErrorColor}"
+                        StrokeThickness="1"
+                        BackgroundColor="{StaticResource SurfaceElev}"
+                        Padding="8,4"
+                        HorizontalOptions="Center">
+                    <Label Text="Error"
+                           FontSize="12"
+                           FontAttributes="Bold"
+                           TextColor="{StaticResource ErrorColor}" />
+                </Border>
                 <Label x:Name="ErrorLabel"
                        FontSize="14"
-                       TextColor="#9E9E9E"
+                       TextColor="{StaticResource TextSecondary}"
                        HorizontalTextAlignment="Center" />
             </VerticalStackLayout>
 
@@ -75,12 +92,12 @@
 
                     <CollectionView.ItemTemplate>
                         <DataTemplate>
-                            <Border Margin="0,0,0,10"
-                                    StrokeShape="RoundRectangle 14"
-                                    Stroke="#E0E0E0"
+                            <Border Margin="0,0,0,8"
+                                    StrokeShape="RoundRectangle 10"
+                                    Stroke="{StaticResource BorderColor}"
                                     StrokeThickness="1"
-                                    BackgroundColor="White"
-                                    Padding="16,14">
+                                    BackgroundColor="{StaticResource Surface}"
+                                    Padding="16,13">
                                 <Grid ColumnDefinitions="*,Auto"
                                       RowDefinitions="Auto,Auto,Auto"
                                       RowSpacing="5"
@@ -89,15 +106,15 @@
                                     <!-- Name -->
                                     <Label Grid.Row="0" Grid.Column="0"
                                            Text="{Binding Name}"
-                                           FontSize="16"
+                                           FontSize="15"
                                            FontAttributes="Bold"
-                                           TextColor="#212121"
+                                           TextColor="{StaticResource TextPrimary}"
                                            VerticalOptions="Center" />
 
                                     <!-- Status badge -->
                                     <Label Grid.Row="0" Grid.Column="1"
                                            Text="{Binding Status}"
-                                           FontSize="13"
+                                           FontSize="12"
                                            FontAttributes="Bold"
                                            TextColor="{Binding StatusColor}"
                                            VerticalOptions="Center" />
@@ -106,19 +123,19 @@
                                     <Label Grid.Row="1" Grid.Column="0"
                                            Text="{Binding TimeText}"
                                            FontSize="12"
-                                           TextColor="#9E9E9E" />
+                                           TextColor="{StaticResource TextSecondary}" />
 
                                     <!-- Confidence -->
                                     <Label Grid.Row="1" Grid.Column="1"
                                            Text="{Binding Confidence}"
                                            FontSize="12"
-                                           TextColor="#757575" />
+                                           TextColor="{StaticResource TextSecondary}" />
 
                                     <!-- Message -->
                                     <Label Grid.Row="2" Grid.ColumnSpan="2"
                                            Text="{Binding Message}"
                                            FontSize="12"
-                                           TextColor="#BDBDBD"
+                                           TextColor="{StaticResource TextMuted}"
                                            LineBreakMode="TailTruncation" />
 
                                 </Grid>
@@ -129,18 +146,16 @@
                     <CollectionView.EmptyView>
                         <VerticalStackLayout VerticalOptions="Center"
                                              HorizontalOptions="Center"
-                                             Spacing="12"
+                                             Spacing="10"
                                              Margin="0,60,0,0">
-                            <Label Text="📋"
-                                   FontSize="52"
-                                   HorizontalTextAlignment="Center" />
                             <Label Text="No recognition history yet"
-                                   FontSize="16"
-                                   TextColor="#9E9E9E"
+                                   FontSize="15"
+                                   FontAttributes="Bold"
+                                   TextColor="{StaticResource TextSecondary}"
                                    HorizontalTextAlignment="Center" />
                             <Label Text="Recognize a face to see results here"
                                    FontSize="13"
-                                   TextColor="#BDBDBD"
+                                   TextColor="{StaticResource TextMuted}"
                                    HorizontalTextAlignment="Center" />
                         </VerticalStackLayout>
                     </CollectionView.EmptyView>
