@@ -10,25 +10,25 @@
         <!-- ── Header ── -->
         <Grid Grid.Row="0"
               ColumnDefinitions="*,Auto"
-              BackgroundColor="{StaticResource Surface}"
+              BackgroundColor="{DynamicResource Surface}"
               Padding="20,28,16,20">
             <VerticalStackLayout Grid.Column="0" Spacing="4">
                 <Label Text="Recognition History"
                        FontSize="20"
                        FontAttributes="Bold"
-                       TextColor="{StaticResource TextPrimary}"
+                       TextColor="{DynamicResource TextPrimary}"
                        CharacterSpacing="0.3" />
                 <Label Text="Results fetched from the backend"
                        FontSize="13"
-                       TextColor="{StaticResource TextSecondary}" />
+                       TextColor="{DynamicResource TextSecondary}" />
             </VerticalStackLayout>
             <Button Grid.Column="1"
                     x:Name="RefreshButton"
                     Text="Refresh"
                     FontSize="13"
-                    TextColor="{StaticResource TextPrimary}"
-                    BackgroundColor="{StaticResource SurfaceElev}"
-                    BorderColor="{StaticResource BorderColor}"
+                    TextColor="{DynamicResource TextPrimary}"
+                    BackgroundColor="{DynamicResource SurfaceElev}"
+                    BorderColor="{DynamicResource BorderColor}"
                     BorderWidth="1"
                     CornerRadius="8"
                     Clicked="OnRefreshClicked"
@@ -40,7 +40,7 @@
         <BoxView Grid.Row="0"
                  HeightRequest="1"
                  VerticalOptions="End"
-                 Color="{StaticResource BorderColor}" />
+                 Color="{DynamicResource BorderColor}" />
 
         <!-- ── Content ── -->
         <Grid Grid.Row="1">
@@ -52,11 +52,11 @@
                                  HorizontalOptions="Center"
                                  Spacing="12">
                 <ActivityIndicator IsRunning="True"
-                                   Color="{StaticResource Accent}"
+                                   Color="{DynamicResource Accent}"
                                    HorizontalOptions="Center" />
                 <Label Text="Loading..."
                        FontSize="14"
-                       TextColor="{StaticResource TextSecondary}"
+                       TextColor="{DynamicResource TextSecondary}"
                        HorizontalTextAlignment="Center" />
             </VerticalStackLayout>
 
@@ -68,19 +68,19 @@
                                  Padding="32"
                                  Spacing="10">
                 <Border StrokeShape="RoundRectangle 6"
-                        Stroke="{StaticResource ErrorColor}"
+                        Stroke="{DynamicResource ErrorColor}"
                         StrokeThickness="1"
-                        BackgroundColor="{StaticResource SurfaceElev}"
+                        BackgroundColor="{DynamicResource SurfaceElev}"
                         Padding="8,4"
                         HorizontalOptions="Center">
                     <Label Text="Error"
                            FontSize="12"
                            FontAttributes="Bold"
-                           TextColor="{StaticResource ErrorColor}" />
+                           TextColor="{DynamicResource ErrorColor}" />
                 </Border>
                 <Label x:Name="ErrorLabel"
                        FontSize="14"
-                       TextColor="{StaticResource TextSecondary}"
+                       TextColor="{DynamicResource TextSecondary}"
                        HorizontalTextAlignment="Center" />
             </VerticalStackLayout>
 
@@ -94,9 +94,9 @@
                         <DataTemplate>
                             <Border Margin="0,0,0,8"
                                     StrokeShape="RoundRectangle 10"
-                                    Stroke="{StaticResource BorderColor}"
+                                    Stroke="{DynamicResource BorderColor}"
                                     StrokeThickness="1"
-                                    BackgroundColor="{StaticResource Surface}"
+                                    BackgroundColor="{DynamicResource Surface}"
                                     Padding="16,13">
                                 <Grid ColumnDefinitions="*,Auto"
                                       RowDefinitions="Auto,Auto,Auto"
@@ -108,7 +108,7 @@
                                            Text="{Binding Name}"
                                            FontSize="15"
                                            FontAttributes="Bold"
-                                           TextColor="{StaticResource TextPrimary}"
+                                           TextColor="{DynamicResource TextPrimary}"
                                            VerticalOptions="Center" />
 
                                     <!-- Status badge -->
@@ -123,19 +123,19 @@
                                     <Label Grid.Row="1" Grid.Column="0"
                                            Text="{Binding TimeText}"
                                            FontSize="12"
-                                           TextColor="{StaticResource TextSecondary}" />
+                                           TextColor="{DynamicResource TextSecondary}" />
 
                                     <!-- Confidence -->
                                     <Label Grid.Row="1" Grid.Column="1"
                                            Text="{Binding Confidence}"
                                            FontSize="12"
-                                           TextColor="{StaticResource TextSecondary}" />
+                                           TextColor="{DynamicResource TextSecondary}" />
 
                                     <!-- Message -->
                                     <Label Grid.Row="2" Grid.ColumnSpan="2"
                                            Text="{Binding Message}"
                                            FontSize="12"
-                                           TextColor="{StaticResource TextMuted}"
+                                           TextColor="{DynamicResource TextMuted}"
                                            LineBreakMode="TailTruncation" />
 
                                 </Grid>
@@ -151,11 +151,11 @@
                             <Label Text="No recognition history yet"
                                    FontSize="15"
                                    FontAttributes="Bold"
-                                   TextColor="{StaticResource TextSecondary}"
+                                   TextColor="{DynamicResource TextSecondary}"
                                    HorizontalTextAlignment="Center" />
                             <Label Text="Recognize a face to see results here"
                                    FontSize="13"
-                                   TextColor="{StaticResource TextMuted}"
+                                   TextColor="{DynamicResource TextMuted}"
                                    HorizontalTextAlignment="Center" />
                         </VerticalStackLayout>
                     </CollectionView.EmptyView>
