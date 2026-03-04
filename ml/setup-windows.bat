@@ -61,12 +61,19 @@ echo.
 echo ============================================================
 echo  Instalacja zakonczona sukcesem!
 echo.
-echo  Przy kazdym uruchomieniu serwisu ML aktywuj najpierw venv:
+echo  Krok 2: Dodaj zdjecia twarzy do folderu dataset\
+echo    Schemat nazewnictwa: ImieNazwisko_numer.jpg
+echo    Przyklad: Jan Kowalski_1.jpg, Anna Nowak_2.png
 echo.
+echo  Krok 3: Uruchom serwis ML
 echo    call C:\facerecog\venv\Scripts\activate.bat
 echo    python service.py
 echo.
 echo  LUB uzyj gotowego skryptu: run-windows.bat
+echo.
+echo  UWAGA: przy pierwszym uruchomieniu serwis pobiera wagi modelu
+echo  (~90 MB) i buduje baze embeddingów – moze to zajac kilka minut.
+echo  Nastepne uruchomienia sa szybsze (cache na dysku).
 echo ============================================================
 echo.
 
