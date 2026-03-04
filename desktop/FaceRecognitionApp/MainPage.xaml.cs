@@ -21,8 +21,8 @@ public partial class MainPage : ContentPage
         SelectFileButton.IsVisible = _isDesktop;
         TakePhotoButton.IsVisible = !_isDesktop;
         InstructionLabel.Text = _isDesktop
-            ? "Select an image file from your computer to identify a person."
-            : "Take a photo with the camera to identify a person.";
+            ? "Select an image file to identify a person"
+            : "Take a photo with the camera to identify a person";
     }
 
     // ── File picker (desktop only) ───────────────────────────────────────────
@@ -38,7 +38,6 @@ public partial class MainPage : ContentPage
                 {
                     { DevicePlatform.WinUI,       new[] { ".jpg", ".jpeg", ".png", ".bmp" } },
                     { DevicePlatform.MacCatalyst, new[] { "public.image" } },
-                    // Fallback for other platforms (shouldn't be reached)
                     { DevicePlatform.iOS,         new[] { "public.image" } },
                     { DevicePlatform.Android,     new[] { "image/*" } },
                 })
@@ -90,6 +89,8 @@ public partial class MainPage : ContentPage
     private void ShowPhotoPreview(byte[] bytes)
     {
         PhotoPreview.Source = ImageSource.FromStream(() => new MemoryStream(bytes));
+        PhotoPreview.IsVisible = true;
+        PhotoPlaceholder.IsVisible = false;
         RecognizeButton.IsEnabled = true;
         ResultCard.IsVisible = false;
     }
@@ -114,8 +115,10 @@ public partial class MainPage : ContentPage
                 return;
             }
 
-            ResultTitleLabel.Text = result.Found ? "Face Recognized" : "Face Not Recognized";
-            ResultTitleLabel.TextColor = result.Found ? Color.FromArgb("#2e7d32") : Color.FromArgb("#f57f17");
+            ResultStatusLabel.Text = result.Found ? "✅  Face Recognized" : "❌  Face Not Recognized";
+            ResultStatusLabel.TextColor = result.Found
+                ? Color.FromArgb("#2E7D32")
+                : Color.FromArgb("#B71C1C");
             ResultNameLabel.Text = result.Person?.Name ?? "—";
             ResultConfidenceLabel.Text = result.Found ? $"{result.Confidence * 100:F1}%" : "—";
             ResultMessageLabel.Text = result.Message;
@@ -124,7 +127,13 @@ public partial class MainPage : ContentPage
         catch (HttpRequestException ex)
         {
             await DisplayAlert("Connection Error",
-                $"Cannot connect to the backend.\n\n{ex.Message}\n\nCheck the API URL in Settings.",
+                $"Cannot connect to the backend.\n\n{ex.Message}\n\nMake sure the backend server is running on port 5233.",
+                "OK");
+        }
+        catch (TaskCanceledException)
+        {
+            await DisplayAlert("Timeout",
+                "Face recognition timed out. The model may need more time on its first run – please try again.",
                 "OK");
         }
         catch (Exception ex)
@@ -139,8 +148,9 @@ public partial class MainPage : ContentPage
 
     private void SetLoading(bool loading)
     {
-        LoadingIndicator.IsRunning = loading;
-        LoadingIndicator.IsVisible = loading;
+        LoadingPanel.IsVisible = loading;
+        PhotoButtonsRow.IsVisible = !loading;
         RecognizeButton.IsEnabled = !loading && _photoBytes != null;
+        RecognizeButton.Text = loading ? "Recognizing…" : "Identify Face";
     }
 }

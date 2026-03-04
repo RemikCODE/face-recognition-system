@@ -12,7 +12,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // Services
 builder.Services.AddScoped<CsvImportService>();
-builder.Services.AddHttpClient<IFaceRecognitionService, FaceRecognitionService>();
+// DeepFace inference can take several minutes on the first run (model download + embedding).
+// The default 100 s timeout is too short; allow up to 10 minutes.
+builder.Services.AddHttpClient<IFaceRecognitionService, FaceRecognitionService>(client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(10);
+});
 
 // Controllers + Razor Pages (web frontend served from the same host)
 builder.Services.AddControllers();
