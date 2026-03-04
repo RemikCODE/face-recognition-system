@@ -1,4 +1,6 @@
+using System.Net;
 using System.Net.Http.Headers;
+using System.Text.Json;
 using FaceRecognitionApi.Data;
 using FaceRecognitionApi.Models;
 using Microsoft.EntityFrameworkCore;
@@ -54,67 +56,129 @@ public class FaceRecognitionService : IFaceRecognitionService
         return result;
     }
 
+    // Number of times to retry when the ML service responds with 503 (model still loading).
+    private const int MlServiceMaxRetries = 3;
+
+    // Delay between retries (seconds).
+    private const int MlServiceRetryDelaySeconds = 10;
+
     private async Task<RecognitionResult> CallMlServiceAsync(Stream imageStream, string fileName, string mlServiceUrl)
     {
+        // Buffer the entire image into memory so the request body can be
+        // resent on each retry attempt (a Stream can only be read once).
+        byte[] imageBytes;
+        using (var ms = new MemoryStream())
+        {
+            await imageStream.CopyToAsync(ms);
+            imageBytes = ms.ToArray();
+        }
+
+        for (int attempt = 1; attempt <= MlServiceMaxRetries; attempt++)
+        {
+            try
+            {
+                using var content = new MultipartFormDataContent();
+                // MemoryStream is owned and disposed by imageContent -> content (MultipartFormDataContent).
+                var imageContent = new StreamContent(new MemoryStream(imageBytes));
+                imageContent.Headers.ContentType = new MediaTypeHeaderValue(GetMimeType(fileName));
+                content.Add(imageContent, "image", fileName);
+
+                var response = await _httpClient.PostAsync(mlServiceUrl, content);
+
+                // 503 means the ML service is still warming up (loading model weights).
+                // Retry after a short delay so the user doesn't have to press the button again.
+                if (response.StatusCode == HttpStatusCode.ServiceUnavailable && attempt < MlServiceMaxRetries)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    _logger.LogInformation(
+                        "ML service not ready (attempt {Attempt}/{Max}), retrying in {Delay}s. Response: {Body}",
+                        attempt, MlServiceMaxRetries, MlServiceRetryDelaySeconds, body);
+                    await Task.Delay(TimeSpan.FromSeconds(MlServiceRetryDelaySeconds));
+                    continue;
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    var errorMessage = ExtractMlErrorMessage(body) ?? response.StatusCode.ToString();
+                    _logger.LogWarning("ML service returned {Status}. Body: {Body}", response.StatusCode, body);
+                    return new RecognitionResult
+                    {
+                        Found = false,
+                        Message = $"ML service error: {errorMessage}",
+                    };
+                }
+
+                var mlResult = await response.Content.ReadFromJsonAsync<MlServiceResponse>();
+
+                if (mlResult == null || string.IsNullOrWhiteSpace(mlResult.Label))
+                {
+                    return new RecognitionResult { Found = false, Message = "No face recognized." };
+                }
+
+                var recognizedName = CsvImportService.ExtractName(mlResult.Label);
+
+                var person = await _db.Persons
+                    .Where(p => p.ImageFileName == mlResult.Label || p.Name == recognizedName)
+                    .FirstOrDefaultAsync();
+
+                if (person == null)
+                {
+                    return new RecognitionResult
+                    {
+                        Found = false,
+                        Confidence = mlResult.Confidence,
+                        Message = $"Recognized as '{recognizedName}' but not found in database.",
+                    };
+                }
+
+                return new RecognitionResult
+                {
+                    Found = true,
+                    Person = person,
+                    Confidence = mlResult.Confidence,
+                    Message = "Face recognized successfully.",
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error calling ML service (attempt {Attempt}/{Max})", attempt, MlServiceMaxRetries);
+                if (attempt < MlServiceMaxRetries)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(MlServiceRetryDelaySeconds));
+                    continue;
+                }
+
+                return new RecognitionResult
+                {
+                    Found = false,
+                    Message = $"Error communicating with ML service: {ex.Message}",
+                };
+            }
+        }
+
+        // Should never be reached: the loop always returns or throws on the final attempt.
+        throw new InvalidOperationException("Unexpected exit from ML service retry loop.");
+    }
+
+    /// <summary>
+    /// Tries to extract the "error" field from an ML service JSON error body.
+    /// Returns <c>null</c> if the body cannot be parsed.
+    /// </summary>
+    private static string? ExtractMlErrorMessage(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body)) return null;
         try
         {
-            using var content = new MultipartFormDataContent();
-            var imageContent = new StreamContent(imageStream);
-            imageContent.Headers.ContentType = new MediaTypeHeaderValue(GetMimeType(fileName));
-            content.Add(imageContent, "image", fileName);
-
-            var response = await _httpClient.PostAsync(mlServiceUrl, content);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogWarning("ML service returned {Status}", response.StatusCode);
-                return new RecognitionResult
-                {
-                    Found = false,
-                    Message = $"ML service error: {response.StatusCode}",
-                };
-            }
-
-            var mlResult = await response.Content.ReadFromJsonAsync<MlServiceResponse>();
-
-            if (mlResult == null || string.IsNullOrWhiteSpace(mlResult.Label))
-            {
-                return new RecognitionResult { Found = false, Message = "No face recognized." };
-            }
-
-            var recognizedName = CsvImportService.ExtractName(mlResult.Label);
-
-            var person = await _db.Persons
-                .Where(p => p.ImageFileName == mlResult.Label || p.Name == recognizedName)
-                .FirstOrDefaultAsync();
-
-            if (person == null)
-            {
-                return new RecognitionResult
-                {
-                    Found = false,
-                    Confidence = mlResult.Confidence,
-                    Message = $"Recognized as '{recognizedName}' but not found in database.",
-                };
-            }
-
-            return new RecognitionResult
-            {
-                Found = true,
-                Person = person,
-                Confidence = mlResult.Confidence,
-                Message = "Face recognized successfully.",
-            };
+            var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("error", out var prop))
+                return prop.GetString();
         }
-        catch (Exception ex)
+        catch (JsonException)
         {
-            _logger.LogError(ex, "Error calling ML service");
-            return new RecognitionResult
-            {
-                Found = false,
-                Message = $"Error communicating with ML service: {ex.Message}",
-            };
+            // Body was not valid JSON – return null so the caller falls back to the status code.
         }
+        return null;
     }
 
     private async Task SaveLogAsync(RecognitionResult result, string sourceFileName)
