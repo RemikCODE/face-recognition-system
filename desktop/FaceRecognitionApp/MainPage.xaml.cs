@@ -133,7 +133,11 @@ public partial class MainPage : ContentPage
         catch (TaskCanceledException)
         {
             await DisplayAlert("Timeout",
-                "Face recognition timed out. The model may need more time on its first run – please try again.",
+                "Face recognition timed out.\n\n" +
+                "On the very first run the ML service needs to download model weights (~93 MB) " +
+                "and build a face-embedding index for every photo in the dataset – " +
+                "this can take several minutes depending on the size of the dataset and your hardware.\n\n" +
+                "Please wait a moment and try again. Subsequent requests will be much faster.",
                 "OK");
         }
         catch (Exception ex)

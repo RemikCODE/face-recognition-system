@@ -57,7 +57,10 @@ public class FaceRecognitionService : IFaceRecognitionService
     }
 
     // Number of times to retry when the ML service responds with 503 (model still loading).
-    private const int MlServiceMaxRetries = 3;
+    // Warmup can take several minutes on the first run (model download + building .pkl embeddings
+    // for the whole dataset). 30 retries × 10 s = up to 5 minutes of patient waiting, after
+    // which the user sees a clear error instead of having to press the button repeatedly.
+    private const int MlServiceMaxRetries = 30;
 
     // Delay between retries (seconds).
     private const int MlServiceRetryDelaySeconds = 10;

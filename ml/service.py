@@ -1,7 +1,7 @@
 """
 service.py – serwis HTTP do rozpoznawania twarzy.
 
-Używa gotowych, wytrenowanych modeli DeepFace (Facenet512).
+Używa gotowych, wytrenowanych modeli DeepFace (Facenet).
 Nie wymaga żadnego trenowania – wystarczy podać folder ze zdjęciami referencyjnymi.
 
 Nasłuchuje na porcie 5001.
@@ -31,7 +31,9 @@ DEFAULT_PORT = 5001
 BACKEND_PORT = 5233  # port backendu ASP.NET (FaceRecognitionApi)
 
 # Model i metryka odległości
-MODEL_NAME = "Facenet512"   # gotowy, wytrenowany model – pobierany automatycznie (~90 MB)
+MODEL_NAME = "Facenet"      # gotowy, wytrenowany model – pobierany automatycznie (~93 MB)
+                            # Facenet (128-dim) jest ~2x szybszy od Facenet512 (512-dim)
+                            # przy porównywalnej dokładności na małych datasetach.
 DETECTOR = "opencv"         # najszybszy detektor twarzy
 DISTANCE_METRIC = "cosine"
 
@@ -66,7 +68,7 @@ def _warmup() -> None:
     Uruchamiana w tle zaraz po starcie serwisu.
 
     1. Importuje DeepFace + TensorFlow (ciężki import, ~15-60 s przy pierwszym uruchomieniu).
-    2. Wczytuje wagi modelu Facenet512 do pamięci.
+    2. Wczytuje wagi modelu Facenet do pamięci.
     3. Buduje / odczytuje plik .pkl z embeddingami datasetu
        (wolne tylko raz – kolejne starty korzystają z cache).
 
@@ -76,8 +78,8 @@ def _warmup() -> None:
 
     try:
         # ── krok 1: import TF + model ───────────────────────────────────────
-        print("⏳ [Warmup] Wczytywanie TensorFlow i modelu Facenet512…")
-        print("   (pierwsze uruchomienie może potrwać kilka minut – pobieranie wag ~90 MB)")
+        print("⏳ [Warmup] Wczytywanie TensorFlow i modelu Facenet…")
+        print("   (pierwsze uruchomienie może potrwać kilkanaście sekund – pobieranie wag ~93 MB)")
         t0 = time.time()
 
         from deepface import DeepFace  # noqa: C0415  (intentional deferred import)
@@ -165,7 +167,7 @@ def recognize():
     """
     Przyjmuje zdjęcie twarzy i zwraca nazwę osoby.
 
-    Używa gotowego modelu Facenet512 (DeepFace) do porównania twarzy
+    Używa gotowego modelu Facenet (DeepFace) do porównania twarzy
     ze zdjęciami w folderze dataset/.
 
     Request:  POST multipart/form-data, pole 'image'
@@ -275,7 +277,7 @@ def main():
     global _dataset_path, _warmup_start
 
     parser = argparse.ArgumentParser(
-        description="Serwis rozpoznawania twarzy (gotowy model Facenet512, bez trenowania)"
+        description="Serwis rozpoznawania twarzy (gotowy model Facenet, bez trenowania)"
     )
     parser.add_argument("--dataset", default=str(DEFAULT_DATASET),
                         help=f"Folder z referencyjnymi zdjęciami twarzy (domyslnie: {DEFAULT_DATASET})")
