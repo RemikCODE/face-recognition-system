@@ -58,7 +58,7 @@ public class PersonsController : ControllerBase
     }
 
     /// <summary>
-    /// Seeds the database from a CSV file.
+    /// Seeds the database from a CSV file path on the server.
     /// The CSV must have columns: id, label  (e.g. "Robert Downey Jr_87.jpg").
     /// </summary>
     [HttpPost("seed")]
@@ -75,6 +75,73 @@ public class PersonsController : ControllerBase
         return Ok(new { imported = count, message = $"Successfully imported {count} records." });
     }
 
+    /// <summary>
+    /// Seeds the database by uploading a CSV file directly.
+    /// The CSV must have columns: id, label  (e.g. "Robert Downey Jr_87.jpg").
+    /// </summary>
+    [HttpPost("seed-upload")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SeedFromCsvUpload(IFormFile csv)
+    {
+        if (csv == null || csv.Length == 0)
+        {
+            return BadRequest(new { message = "A CSV file is required." });
+        }
+
+        await using var stream = csv.OpenReadStream();
+        var count = await _csvImport.ImportFromStreamAsync(stream);
+        return Ok(new { imported = count, message = $"Successfully imported {count} records." });
+    }
+
+    /// <summary>
+    /// Scans a dataset directory for image files (jpg, jpeg, png, bmp) and seeds
+    /// the Persons table from the filenames found.  The file must be named in the
+    /// format "Person Name_N.ext" (e.g. "Robert Downey Jr_87.jpg").
+    /// Existing records are replaced.
+    /// </summary>
+    [HttpPost("scan-dataset")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ScanDataset([FromBody] ScanDatasetRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.DatasetPath))
+        {
+            return BadRequest(new { message = "datasetPath is required." });
+        }
+
+        if (!Directory.Exists(request.DatasetPath))
+        {
+            return BadRequest(new { message = $"Directory not found: {request.DatasetPath}" });
+        }
+
+        var imageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { ".jpg", ".jpeg", ".png", ".bmp" };
+
+        var files = Directory.EnumerateFiles(request.DatasetPath, "*", SearchOption.TopDirectoryOnly)
+            .Where(f => imageExtensions.Contains(Path.GetExtension(f)))
+            .OrderBy(f => f)
+            .ToList();
+
+        if (files.Count == 0)
+        {
+            return BadRequest(new { message = "No image files found in the specified directory." });
+        }
+
+        var records = files.Select(f => new Person
+        {
+            Name = CsvImportService.ExtractName(Path.GetFileName(f)),
+            ImageFileName = Path.GetFileName(f),
+        }).ToList();
+
+        await _db.Persons.ExecuteDeleteAsync();
+        await _db.Persons.AddRangeAsync(records);
+        await _db.SaveChangesAsync();
+
+        return Ok(new { imported = records.Count, message = $"Successfully imported {records.Count} records from dataset." });
+    }
+
     /// <summary>Deletes all persons from the database.</summary>
     [HttpDelete]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -88,5 +155,10 @@ public class PersonsController : ControllerBase
     public class SeedRequest
     {
         public string CsvFilePath { get; set; } = string.Empty;
+    }
+
+    public class ScanDatasetRequest
+    {
+        public string DatasetPath { get; set; } = string.Empty;
     }
 }

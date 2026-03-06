@@ -127,12 +127,20 @@ public class FaceRecognitionService : IFaceRecognitionService
 
                 if (person == null)
                 {
-                    return new RecognitionResult
+                    // ML recognized the person but they are not yet in the database
+                    // (e.g. the Persons table was never seeded from CSV).
+                    // Auto-insert so future lookups succeed without manual seeding.
+                    _logger.LogInformation(
+                        "Person '{Name}' (label: {Label}) not found in DB – auto-inserting.",
+                        recognizedName, mlResult.Label);
+
+                    person = new Person
                     {
-                        Found = false,
-                        Confidence = mlResult.Confidence,
-                        Message = $"Recognized as '{recognizedName}' but not found in database.",
+                        Name = recognizedName,
+                        ImageFileName = mlResult.Label,
                     };
+                    _db.Persons.Add(person);
+                    await _db.SaveChangesAsync();
                 }
 
                 return new RecognitionResult
