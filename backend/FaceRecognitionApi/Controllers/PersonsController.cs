@@ -12,11 +12,19 @@ public class PersonsController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly CsvImportService _csvImport;
+    private readonly IConfiguration _config;
+    private readonly ILogger<PersonsController> _logger;
 
-    public PersonsController(AppDbContext db, CsvImportService csvImport)
+    // Characters that are unsafe in filenames across Windows, macOS and Linux.
+    private static readonly char[] UnsafeFileNameChars =
+        ['/', '\\', ':', '*', '?', '"', '<', '>', '|', '\0'];
+
+    public PersonsController(AppDbContext db, CsvImportService csvImport, IConfiguration config, ILogger<PersonsController> logger)
     {
         _db = db;
         _csvImport = csvImport;
+        _config = config;
+        _logger = logger;
     }
 
     /// <summary>Gets a paginated list of all persons in the database.</summary>
@@ -144,6 +152,80 @@ public class PersonsController : ControllerBase
         await _db.SaveChangesAsync();
 
         return Ok(new { imported = records.Count, message = $"Successfully imported {records.Count} records from dataset." });
+    }
+
+    /// <summary>
+    /// Adds a single person to the database and saves their photo to the dataset folder.
+    /// The image is stored as "Name_unixTimestamp.ext" in the configured DatasetPath so that
+    /// <see cref="CsvImportService.ExtractName"/> can recover the name from the filename.
+    /// The DeepFace embedding cache (.pkl) is deleted afterwards so the ML service will
+    /// rebuild it automatically on the next recognition request.
+    /// </summary>
+    [HttpPost]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(Person), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> AddPerson([FromForm] string name, IFormFile image)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return BadRequest(new { message = "Name is required." });
+
+        if (image == null || image.Length == 0)
+            return BadRequest(new { message = "An image file is required." });
+
+        var datasetPath = _config["DatasetPath"];
+        if (string.IsNullOrWhiteSpace(datasetPath) || !Directory.Exists(datasetPath))
+            return BadRequest(new { message = "Dataset folder is not configured or does not exist on the server. Set 'DatasetPath' in appsettings." });
+
+        // Build a safe filename: "Name_timestamp.ext"
+        var ext = Path.GetExtension(image.FileName).ToLowerInvariant();
+        if (ext is not (".jpg" or ".jpeg" or ".png" or ".bmp"))
+            ext = ".jpg";
+
+        var safeName = string.Concat(name.Trim().Split(UnsafeFileNameChars)).Trim();
+        if (string.IsNullOrWhiteSpace(safeName))
+            return BadRequest(new { message = "Name contains only invalid characters. Please provide a valid name." });
+
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var fileName = $"{safeName}_{timestamp}{ext}";
+        var filePath = Path.Combine(datasetPath, fileName);
+
+        // Write to a temp file first, then move atomically to avoid leaving partial files
+        // in the dataset folder if the upload is interrupted (e.g. disk full).
+        var tmpPath = filePath + ".tmp";
+        try
+        {
+            await using (var readStream = image.OpenReadStream())
+            await using (var fileStream = System.IO.File.Create(tmpPath))
+            {
+                await readStream.CopyToAsync(fileStream);
+            }
+            System.IO.File.Move(tmpPath, filePath, overwrite: false);
+        }
+        catch
+        {
+            try { System.IO.File.Delete(tmpPath); } catch { /* best-effort cleanup */ }
+            throw;
+        }
+
+        // Invalidate the DeepFace embedding cache so the ML service rebuilds it on the next call.
+        foreach (var pkl in Directory.EnumerateFiles(datasetPath, "ds_model_*.pkl"))
+        {
+            try
+            {
+                System.IO.File.Delete(pkl);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not delete embedding cache file {Pkl}. The ML service may use stale embeddings.", pkl);
+            }
+        }
+
+        var person = new Person { Name = name.Trim(), ImageFileName = fileName };
+        _db.Persons.Add(person);
+        await _db.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetById), new { id = person.Id }, person);
     }
 
     /// <summary>Deletes all persons from the database.</summary>

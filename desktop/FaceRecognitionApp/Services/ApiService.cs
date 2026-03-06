@@ -52,6 +52,25 @@ public class ApiService
     }
 
     /// <summary>
+    /// Uploads a photo and name to POST /api/persons and returns the created person.
+    /// </summary>
+    public async Task<Person?> AddPersonAsync(string name, Stream imageStream, string fileName)
+    {
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent(name), "name");
+        var imgContent = new StreamContent(imageStream);
+        imgContent.Headers.ContentType = new MediaTypeHeaderValue(GetMimeType(fileName));
+        form.Add(imgContent, "image", fileName);
+
+        var response = await _httpClient.PostAsync("api/persons", form);
+        response.EnsureSuccessStatusCode();
+
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<Person>(json,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+    }
+
+    /// <summary>
     /// Returns recent recognition log entries from GET /api/recognitions.
     /// This is the same data shown on the backend web dashboard.
     /// </summary>

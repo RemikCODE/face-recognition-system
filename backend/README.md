@@ -47,6 +47,7 @@ On startup the application also tries to auto-seed the `Persons` table from a bu
 |-----|-------------|---------|
 | `ConnectionStrings:DefaultConnection` | SQLite connection string | `Data Source=face_recognition.db` |
 | `MlService:Url` | URL of the Python ML microservice that performs face recognition | *(empty – feature disabled)* |
+| `DatasetPath` | Path to the ML dataset folder – required for `POST /api/persons` and auto-seeding | *(empty)* |
 | `Cors:AllowedOrigins` | Array of allowed CORS origins | *(empty – all origins allowed)* |
 
 In `appsettings.Development.json` the ML service is pre-configured to `http://localhost:5001/recognize`.
@@ -68,10 +69,25 @@ The service must accept `POST multipart/form-data` with a field named `image` an
 |--------|------|-------------|
 | `GET` | `/api/persons` | List persons (supports `?search=`, `?page=`, `?pageSize=`) |
 | `GET` | `/api/persons/{id}` | Get person by ID |
+| `POST` | `/api/persons` | **Add a single person** – saves photo to the dataset and adds DB record |
 | `POST` | `/api/persons/seed` | Seed DB from a CSV file **path on the server** |
 | `POST` | `/api/persons/seed-upload` | Seed DB by **uploading** a CSV file (multipart/form-data) |
 | `POST` | `/api/persons/scan-dataset` | Seed DB by **scanning a dataset folder** for image files |
 | `DELETE` | `/api/persons` | Delete all persons |
+
+**Add person** (`POST /api/persons`):  
+`multipart/form-data` with fields:
+- `name` – full name of the person (e.g. `John Smith`)
+- `image` – photo file (JPEG/PNG/BMP)
+
+The photo is saved to the configured `DatasetPath` folder as `Name_timestamp.ext`.  
+The DeepFace embedding cache (`.pkl`) is deleted so the ML service rebuilds it on the next recognition request.  
+Set `DatasetPath` in `appsettings.json` to the same folder used by the ML service.
+
+**Response** (`201 Created`):
+```json
+{ "id": 42, "name": "John Smith", "imageFileName": "John Smith_1741296000.jpg" }
+```
 
 **Seed by server path** (`POST /api/persons/seed`) request body:
 ```json

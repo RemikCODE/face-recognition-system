@@ -2,7 +2,7 @@ namespace FaceRecognitionApp;
 
 public partial class AppShell : Shell
 {
-    public AppShell(MainPage mainPage, HistoryPage historyPage)
+    public AppShell(MainPage mainPage, HistoryPage historyPage, AddPersonPage addPersonPage)
     {
         InitializeComponent();
 
@@ -19,6 +19,12 @@ public partial class AppShell : Shell
         {
             Title = "History",
             Content = historyPage,
+        });
+
+        tabBar.Items.Add(new ShellContent
+        {
+            Title = "Add Person",
+            Content = addPersonPage,
         });
 
         Items.Add(tabBar);
