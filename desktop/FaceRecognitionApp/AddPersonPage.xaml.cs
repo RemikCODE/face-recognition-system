@@ -20,8 +20,6 @@ public partial class AddPersonPage : ContentPage
         TakePhotoButton.IsVisible = !_isDesktop;
     }
 
-    // ── File picker (desktop) ────────────────────────────────────────────────
-
     private async void OnSelectFileClicked(object sender, EventArgs e)
     {
         try
@@ -52,8 +50,6 @@ public partial class AddPersonPage : ContentPage
             await DisplayAlert("Error", ex.Message, "OK");
         }
     }
-
-    // ── Camera capture (mobile) ──────────────────────────────────────────────
 
     private async void OnTakePhotoClicked(object sender, EventArgs e)
     {
@@ -101,8 +97,6 @@ public partial class AddPersonPage : ContentPage
         AddButton.IsEnabled = _photoBytes != null && !string.IsNullOrWhiteSpace(NameEntry.Text);
     }
 
-    // ── Add person ───────────────────────────────────────────────────────────
-
     private async void OnAddClicked(object sender, EventArgs e)
     {
         var name = NameEntry.Text?.Trim();
@@ -123,7 +117,6 @@ public partial class AddPersonPage : ContentPage
                 : name;
             ResultCard.IsVisible = true;
 
-            // Reset form for next entry
             NameEntry.Text = string.Empty;
             _photoBytes = null;
             _photoFileName = "photo.jpg";

@@ -17,9 +17,6 @@ public class CsvImportService
         _logger = logger;
     }
 
-    /// <summary>
-    /// Seeds the Persons table from a CSV file path on the server.
-    /// </summary>
     public async Task<int> ImportAsync(string csvFilePath)
     {
         if (!File.Exists(csvFilePath))
@@ -34,11 +31,6 @@ public class CsvImportService
         return count;
     }
 
-    /// <summary>
-    /// Seeds the Persons table from an uploaded CSV stream (e.g. IFormFile).
-    /// Expected CSV format (with header): id,label
-    /// where label is a filename like "Robert Downey Jr_87.jpg"
-    /// </summary>
     public async Task<int> ImportFromStreamAsync(Stream csvStream)
     {
         var config = new CsvConfiguration(CultureInfo.InvariantCulture)
@@ -78,10 +70,6 @@ public class CsvImportService
         return records.Count;
     }
 
-    /// <summary>
-    /// Extracts the person name from a filename like "Robert Downey Jr_87.jpg".
-    /// Returns "Robert Downey Jr" by removing the last "_N" part and the extension.
-    /// </summary>
     public static string ExtractName(string label)
     {
         var nameWithoutExt = Path.GetFileNameWithoutExtension(label);

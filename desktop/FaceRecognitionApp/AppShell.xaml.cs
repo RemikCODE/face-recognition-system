@@ -6,7 +6,6 @@ public partial class AppShell : Shell
     {
         InitializeComponent();
 
-        // Build the tab bar using DI-resolved page instances
         var tabBar = new TabBar();
 
         tabBar.Items.Add(new ShellContent

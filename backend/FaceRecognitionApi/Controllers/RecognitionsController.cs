@@ -16,10 +16,6 @@ public class RecognitionsController : ControllerBase
         _db = db;
     }
 
-    /// <summary>
-    /// Returns the most recent recognition log entries (newest first).
-    /// Used by the web results dashboard for auto-polling.
-    /// </summary>
     [HttpGet]
     public async Task<ActionResult<IEnumerable<RecognitionLog>>> GetRecent([FromQuery] int limit = 20)
     {

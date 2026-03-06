@@ -21,7 +21,6 @@ public class PersonsController : ControllerBase
         _mlService = mlService;
     }
 
-    /// <summary>Gets a paginated list of all persons in the database.</summary>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<Person>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
@@ -49,7 +48,6 @@ public class PersonsController : ControllerBase
         return Ok(new { total, page, pageSize, items });
     }
 
-    /// <summary>Gets a single person by ID.</summary>
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(Person), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -59,10 +57,6 @@ public class PersonsController : ControllerBase
         return person is null ? NotFound() : Ok(person);
     }
 
-    /// <summary>
-    /// Seeds the database from a CSV file path on the server.
-    /// The CSV must have columns: id, label  (e.g. "Robert Downey Jr_87.jpg").
-    /// </summary>
     [HttpPost("seed")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -77,10 +71,6 @@ public class PersonsController : ControllerBase
         return Ok(new { imported = count, message = $"Successfully imported {count} records." });
     }
 
-    /// <summary>
-    /// Seeds the database by uploading a CSV file directly.
-    /// The CSV must have columns: id, label  (e.g. "Robert Downey Jr_87.jpg").
-    /// </summary>
     [HttpPost("seed-upload")]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
@@ -97,12 +87,6 @@ public class PersonsController : ControllerBase
         return Ok(new { imported = count, message = $"Successfully imported {count} records." });
     }
 
-    /// <summary>
-    /// Scans a dataset directory for image files (jpg, jpeg, png, bmp) and seeds
-    /// the Persons table from the filenames found.  The file must be named in the
-    /// format "Person Name_N.ext" (e.g. "Robert Downey Jr_87.jpg").
-    /// Existing records are replaced.
-    /// </summary>
     [HttpPost("scan-dataset")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -131,7 +115,6 @@ public class PersonsController : ControllerBase
             return BadRequest(new { message = "No image files found in the specified directory." });
         }
 
-        // Deduplicate by name: one DB row per unique person (one representative image).
         var records = files
             .GroupBy(f => CsvImportService.ExtractName(Path.GetFileName(f)))
             .Select(g => new Person
@@ -148,11 +131,6 @@ public class PersonsController : ControllerBase
         return Ok(new { imported = records.Count, message = $"Successfully imported {records.Count} records from dataset." });
     }
 
-    /// <summary>
-    /// Adds a single person to the recognition database.
-    /// The photo is forwarded to the ML service which stores it in its dataset folder
-    /// and rebuilds face embeddings on the next recognition request.
-    /// </summary>
     [HttpPost]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(Person), StatusCodes.Status201Created)]
@@ -179,7 +157,6 @@ public class PersonsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = person.Id }, person);
     }
 
-    /// <summary>Deletes all persons from the database.</summary>
     [HttpDelete]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteAll()

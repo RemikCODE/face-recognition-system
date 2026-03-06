@@ -15,8 +15,6 @@ public partial class MainPage : ContentPage
         InitializeComponent();
         _apiService = apiService;
 
-        // Desktop (Windows/Mac): file picker only.
-        // Mobile (Android/iOS): camera only.
         _isDesktop = DeviceInfo.Idiom == DeviceIdiom.Desktop;
         SelectFileButton.IsVisible = _isDesktop;
         TakePhotoButton.IsVisible = !_isDesktop;
@@ -24,8 +22,6 @@ public partial class MainPage : ContentPage
             ? "Select an image file to identify a person"
             : "Take a photo with the camera to identify a person";
     }
-
-    // ── File picker (desktop only) ───────────────────────────────────────────
 
     private async void OnSelectFileClicked(object sender, EventArgs e)
     {
@@ -57,8 +53,6 @@ public partial class MainPage : ContentPage
             await DisplayAlert("Error", ex.Message, "OK");
         }
     }
-
-    // ── Camera capture (mobile only) ────────────────────────────────────────
 
     private async void OnTakePhotoClicked(object sender, EventArgs e)
     {
@@ -94,8 +88,6 @@ public partial class MainPage : ContentPage
         RecognizeButton.IsEnabled = true;
         ResultCard.IsVisible = false;
     }
-
-    // ── Recognition ─────────────────────────────────────────────────────────
 
     private async void OnRecognizeClicked(object sender, EventArgs e)
     {

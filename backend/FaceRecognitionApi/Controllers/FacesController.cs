@@ -15,11 +15,6 @@ public class FacesController : ControllerBase
         _recognitionService = recognitionService;
     }
 
-    /// <summary>
-    /// Recognizes a face in the uploaded image.
-    /// Accepts a multipart/form-data POST with an image file.
-    /// Returns the best matching person from the database.
-    /// </summary>
     [HttpPost("recognize")]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(RecognitionResult), StatusCodes.Status200OK)]
