@@ -78,11 +78,15 @@ using (var scope = app.Services.CreateScope())
 
             if (files.Count > 0)
             {
-                var records = files.Select(f => new FaceRecognitionApi.Models.Person
-                {
-                    Name = FaceRecognitionApi.Services.CsvImportService.ExtractName(Path.GetFileName(f)),
-                    ImageFileName = Path.GetFileName(f),
-                }).ToList();
+                // Deduplicate by name: one DB row per unique person (one representative image).
+                var records = files
+                    .GroupBy(f => FaceRecognitionApi.Services.CsvImportService.ExtractName(Path.GetFileName(f)))
+                    .Select(g => new FaceRecognitionApi.Models.Person
+                    {
+                        Name = g.Key,
+                        ImageFileName = Path.GetFileName(g.First()),
+                    })
+                    .ToList();
 
                 db.Persons.AddRange(records);
                 await db.SaveChangesAsync();

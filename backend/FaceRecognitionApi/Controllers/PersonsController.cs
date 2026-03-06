@@ -129,11 +129,15 @@ public class PersonsController : ControllerBase
             return BadRequest(new { message = "No image files found in the specified directory." });
         }
 
-        var records = files.Select(f => new Person
-        {
-            Name = CsvImportService.ExtractName(Path.GetFileName(f)),
-            ImageFileName = Path.GetFileName(f),
-        }).ToList();
+        // Deduplicate by name: one DB row per unique person (one representative image).
+        var records = files
+            .GroupBy(f => CsvImportService.ExtractName(Path.GetFileName(f)))
+            .Select(g => new Person
+            {
+                Name = g.Key,
+                ImageFileName = Path.GetFileName(g.First()),
+            })
+            .ToList();
 
         await _db.Persons.ExecuteDeleteAsync();
         await _db.Persons.AddRangeAsync(records);
