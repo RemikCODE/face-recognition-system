@@ -7,13 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FaceRecognitionApi.Services;
 
-/// <summary>
-/// Delegates face recognition to a Python ML microservice.
-/// The ML service is expected to accept a multipart/form-data POST with the image
-/// and return JSON: { "label": "Robert Downey Jr_87.jpg", "confidence": 0.92 }
-/// If the ML service URL is not configured, the service returns a not-configured result.
-/// Every result is persisted to RecognitionLogs for the web results dashboard.
-/// </summary>
 public class FaceRecognitionService : IFaceRecognitionService
 {
     private readonly AppDbContext _db;
@@ -56,19 +49,11 @@ public class FaceRecognitionService : IFaceRecognitionService
         return result;
     }
 
-    // Number of times to retry when the ML service responds with 503 (model still loading).
-    // Warmup can take several minutes on the first run (model download + building .pkl embeddings
-    // for the whole dataset). 30 retries × 10 s = up to 5 minutes of patient waiting, after
-    // which the user sees a clear error instead of having to press the button repeatedly.
     private const int MlServiceMaxRetries = 30;
-
-    // Delay between retries (seconds).
     private const int MlServiceRetryDelaySeconds = 10;
 
     private async Task<RecognitionResult> CallMlServiceAsync(Stream imageStream, string fileName, string mlServiceUrl)
     {
-        // Buffer the entire image into memory so the request body can be
-        // resent on each retry attempt (a Stream can only be read once).
         byte[] imageBytes;
         using (var ms = new MemoryStream())
         {
@@ -81,15 +66,12 @@ public class FaceRecognitionService : IFaceRecognitionService
             try
             {
                 using var content = new MultipartFormDataContent();
-                // MemoryStream is owned and disposed by imageContent -> content (MultipartFormDataContent).
                 var imageContent = new StreamContent(new MemoryStream(imageBytes));
                 imageContent.Headers.ContentType = new MediaTypeHeaderValue(GetMimeType(fileName));
                 content.Add(imageContent, "image", fileName);
 
                 var response = await _httpClient.PostAsync(mlServiceUrl, content);
 
-                // 503 means the ML service is still warming up (loading model weights).
-                // Retry after a short delay so the user doesn't have to press the button again.
                 if (response.StatusCode == HttpStatusCode.ServiceUnavailable && attempt < MlServiceMaxRetries)
                 {
                     var body = await response.Content.ReadAsStringAsync();
@@ -127,12 +109,17 @@ public class FaceRecognitionService : IFaceRecognitionService
 
                 if (person == null)
                 {
-                    return new RecognitionResult
+                    _logger.LogInformation(
+                        "Person '{Name}' (label: {Label}) not found in DB – auto-inserting.",
+                        recognizedName, mlResult.Label);
+
+                    person = new Person
                     {
-                        Found = false,
-                        Confidence = mlResult.Confidence,
-                        Message = $"Recognized as '{recognizedName}' but not found in database.",
+                        Name = recognizedName,
+                        ImageFileName = mlResult.Label,
                     };
+                    _db.Persons.Add(person);
+                    await _db.SaveChangesAsync();
                 }
 
                 return new RecognitionResult
@@ -160,14 +147,9 @@ public class FaceRecognitionService : IFaceRecognitionService
             }
         }
 
-        // Should never be reached: the loop always returns or throws on the final attempt.
         throw new InvalidOperationException("Unexpected exit from ML service retry loop.");
     }
 
-    /// <summary>
-    /// Tries to extract the "error" field from an ML service JSON error body.
-    /// Returns <c>null</c> if the body cannot be parsed.
-    /// </summary>
     private static string? ExtractMlErrorMessage(string body)
     {
         if (string.IsNullOrWhiteSpace(body)) return null;
@@ -179,7 +161,6 @@ public class FaceRecognitionService : IFaceRecognitionService
         }
         catch (JsonException)
         {
-            // Body was not valid JSON – return null so the caller falls back to the status code.
         }
         return null;
     }
@@ -211,9 +192,50 @@ public class FaceRecognitionService : IFaceRecognitionService
         };
     }
 
+    private string? GetMlServiceBaseUrl()
+    {
+        var url = _config["MlService:Url"];
+        if (string.IsNullOrWhiteSpace(url)) return null;
+        return new Uri(url).GetLeftPart(UriPartial.Authority);
+    }
+
+    public async Task<string?> AddPersonAsync(string name, Stream imageStream, string fileName)
+    {
+        var baseUrl = GetMlServiceBaseUrl();
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            _logger.LogWarning("ML service URL is not configured. Set 'MlService:Url' in appsettings.");
+            return null;
+        }
+
+        byte[] imageBytes;
+        using (var ms = new MemoryStream())
+        {
+            await imageStream.CopyToAsync(ms);
+            imageBytes = ms.ToArray();
+        }
+
+        using var content = new MultipartFormDataContent();
+        content.Add(new StringContent(name), "name");
+        var imageContent = new StreamContent(new MemoryStream(imageBytes));
+        imageContent.Headers.ContentType = new MediaTypeHeaderValue(GetMimeType(fileName));
+        content.Add(imageContent, "image", fileName);
+
+        var response = await _httpClient.PostAsync($"{baseUrl}/add-person", content);
+        response.EnsureSuccessStatusCode();
+
+        var doc = await response.Content.ReadFromJsonAsync<AddPersonResponse>();
+        return doc?.Filename;
+    }
+
     private class MlServiceResponse
     {
         public string Label { get; set; } = string.Empty;
         public double Confidence { get; set; }
+    }
+
+    private class AddPersonResponse
+    {
+        public string Filename { get; set; } = string.Empty;
     }
 }

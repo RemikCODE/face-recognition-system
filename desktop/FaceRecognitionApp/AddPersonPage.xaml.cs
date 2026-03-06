@@ -2,7 +2,7 @@ using FaceRecognitionApp.Services;
 
 namespace FaceRecognitionApp;
 
-public partial class MainPage : ContentPage
+public partial class AddPersonPage : ContentPage
 {
     private readonly ApiService _apiService;
     private readonly bool _isDesktop;
@@ -10,7 +10,7 @@ public partial class MainPage : ContentPage
     private byte[]? _photoBytes;
     private string _photoFileName = "photo.jpg";
 
-    public MainPage(ApiService apiService)
+    public AddPersonPage(ApiService apiService)
     {
         InitializeComponent();
         _apiService = apiService;
@@ -18,9 +18,6 @@ public partial class MainPage : ContentPage
         _isDesktop = DeviceInfo.Idiom == DeviceIdiom.Desktop;
         SelectFileButton.IsVisible = _isDesktop;
         TakePhotoButton.IsVisible = !_isDesktop;
-        InstructionLabel.Text = _isDesktop
-            ? "Select an image file to identify a person"
-            : "Take a photo with the camera to identify a person";
     }
 
     private async void OnSelectFileClicked(object sender, EventArgs e)
@@ -29,7 +26,7 @@ public partial class MainPage : ContentPage
         {
             var result = await FilePicker.Default.PickAsync(new PickOptions
             {
-                PickerTitle = "Select a face image",
+                PickerTitle = "Select a photo of the person",
                 FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
                 {
                     { DevicePlatform.WinUI,       new[] { ".jpg", ".jpeg", ".png", ".bmp" } },
@@ -85,13 +82,25 @@ public partial class MainPage : ContentPage
         PhotoPreview.Source = ImageSource.FromStream(() => new MemoryStream(bytes));
         PhotoPreview.IsVisible = true;
         PhotoPlaceholder.IsVisible = false;
-        RecognizeButton.IsEnabled = true;
         ResultCard.IsVisible = false;
+        UpdateAddButton();
     }
 
-    private async void OnRecognizeClicked(object sender, EventArgs e)
+    private void OnNameTextChanged(object sender, TextChangedEventArgs e)
     {
-        if (_photoBytes == null) return;
+        ResultCard.IsVisible = false;
+        UpdateAddButton();
+    }
+
+    private void UpdateAddButton()
+    {
+        AddButton.IsEnabled = _photoBytes != null && !string.IsNullOrWhiteSpace(NameEntry.Text);
+    }
+
+    private async void OnAddClicked(object sender, EventArgs e)
+    {
+        var name = NameEntry.Text?.Trim();
+        if (_photoBytes == null || string.IsNullOrWhiteSpace(name)) return;
 
         SetLoading(true);
         ResultCard.IsVisible = false;
@@ -99,38 +108,28 @@ public partial class MainPage : ContentPage
         try
         {
             using var imageStream = new MemoryStream(_photoBytes);
-            var result = await _apiService.RecognizeAsync(imageStream, _photoFileName);
+            var person = await _apiService.AddPersonAsync(name, imageStream, _photoFileName);
 
-            if (result == null)
-            {
-                await DisplayAlert("Error", "No response received from the server.", "OK");
-                return;
-            }
-
-            ResultStatusLabel.Text = result.Found ? "Face Recognized" : "Not Recognized";
-            ResultStatusLabel.TextColor = result.Found
-                ? Color.FromArgb("#3FB950")
-                : Color.FromArgb("#F85149");
-            ResultNameLabel.Text = result.Person?.Name ?? "—";
-            ResultConfidenceLabel.Text = result.Found ? $"{result.Confidence * 100:F1}%" : "—";
-            ResultMessageLabel.Text = result.Message;
+            ResultStatusLabel.Text = "Person added successfully";
+            ResultStatusLabel.TextColor = Color.FromArgb("#3FB950");
+            ResultDetailLabel.Text = person != null
+                ? $"{person.Name} (ID: {person.Id})"
+                : name;
             ResultCard.IsVisible = true;
+
+            NameEntry.Text = string.Empty;
+            _photoBytes = null;
+            _photoFileName = "photo.jpg";
+            PhotoPreview.IsVisible = false;
+            PhotoPlaceholder.IsVisible = true;
+            UpdateAddButton();
         }
         catch (HttpRequestException ex)
         {
-            await DisplayAlert("Connection Error",
-                $"Cannot connect to the backend.\n\n{ex.Message}\n\nMake sure the backend server is running on port 5233.",
-                "OK");
-        }
-        catch (TaskCanceledException)
-        {
-            await DisplayAlert("Timeout",
-                "Face recognition timed out.\n\n" +
-                "On the very first run the ML service needs to download model weights (~93 MB) " +
-                "and build a face-embedding index for every photo in the dataset – " +
-                "this can take several minutes depending on the size of the dataset and your hardware.\n\n" +
-                "Please wait a moment and try again. Subsequent requests will be much faster.",
-                "OK");
+            ResultStatusLabel.Text = "Failed to add person";
+            ResultStatusLabel.TextColor = Color.FromArgb("#F85149");
+            ResultDetailLabel.Text = ex.Message;
+            ResultCard.IsVisible = true;
         }
         catch (Exception ex)
         {
@@ -146,7 +145,7 @@ public partial class MainPage : ContentPage
     {
         LoadingPanel.IsVisible = loading;
         PhotoButtonsRow.IsVisible = !loading;
-        RecognizeButton.IsEnabled = !loading && _photoBytes != null;
-        RecognizeButton.Text = loading ? "Recognizing…" : "Identify Face";
+        AddButton.IsEnabled = !loading && _photoBytes != null && !string.IsNullOrWhiteSpace(NameEntry.Text);
+        AddButton.Text = loading ? "Saving…" : "Add Person";
     }
 }

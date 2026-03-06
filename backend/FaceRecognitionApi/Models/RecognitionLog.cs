@@ -1,10 +1,5 @@
 namespace FaceRecognitionApi.Models;
 
-/// <summary>
-/// Persisted record of a single face-recognition attempt.
-/// Written by FaceRecognitionService after every /api/faces/recognize call.
-/// Displayed on the web results dashboard (/).
-/// </summary>
 public class RecognitionLog
 {
     public int Id { get; set; }

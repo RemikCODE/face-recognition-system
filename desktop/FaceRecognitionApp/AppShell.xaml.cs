@@ -2,11 +2,10 @@ namespace FaceRecognitionApp;
 
 public partial class AppShell : Shell
 {
-    public AppShell(MainPage mainPage, HistoryPage historyPage)
+    public AppShell(MainPage mainPage, HistoryPage historyPage, AddPersonPage addPersonPage)
     {
         InitializeComponent();
 
-        // Build the tab bar using DI-resolved page instances
         var tabBar = new TabBar();
 
         tabBar.Items.Add(new ShellContent
@@ -19,6 +18,12 @@ public partial class AppShell : Shell
         {
             Title = "History",
             Content = historyPage,
+        });
+
+        tabBar.Items.Add(new ShellContent
+        {
+            Title = "Add Person",
+            Content = addPersonPage,
         });
 
         Items.Add(tabBar);

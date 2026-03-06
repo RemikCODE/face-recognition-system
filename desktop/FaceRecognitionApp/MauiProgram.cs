@@ -18,13 +18,12 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
-        // HTTP client and app services
         builder.Services.AddHttpClient<ApiService>();
         builder.Services.AddSingleton<ApiService>();
 
-        // Pages (registered for DI constructor injection)
         builder.Services.AddTransient<MainPage>();
         builder.Services.AddTransient<HistoryPage>();
+        builder.Services.AddTransient<AddPersonPage>();
         builder.Services.AddTransient<AppShell>();
 
 #if DEBUG

@@ -5,8 +5,6 @@ public partial class App : MauiWinUIApplication
     public App()
     {
         this.InitializeComponent();
-
-        // Surface unhandled exceptions as a dialog instead of a silent crash.
         this.UnhandledException += OnUnhandledException;
     }
 
@@ -29,6 +27,6 @@ public partial class App : MauiWinUIApplication
                 XamlRoot = xamlRoot,
             }.ShowAsync();
         }
-        catch { /* dialog itself failed; nothing more we can do */ }
+        catch { }
     }
 }
