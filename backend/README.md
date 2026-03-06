@@ -47,7 +47,6 @@ On startup the application also tries to auto-seed the `Persons` table from a bu
 |-----|-------------|---------|
 | `ConnectionStrings:DefaultConnection` | SQLite connection string | `Data Source=face_recognition.db` |
 | `MlService:Url` | URL of the Python ML microservice that performs face recognition | *(empty – feature disabled)* |
-| `DatasetPath` | Path to the ML dataset folder – required for `POST /api/persons` and auto-seeding | *(empty)* |
 | `Cors:AllowedOrigins` | Array of allowed CORS origins | *(empty – all origins allowed)* |
 
 In `appsettings.Development.json` the ML service is pre-configured to `http://localhost:5001/recognize`.
@@ -80,9 +79,7 @@ The service must accept `POST multipart/form-data` with a field named `image` an
 - `name` – full name of the person (e.g. `John Smith`)
 - `image` – photo file (JPEG/PNG/BMP)
 
-The photo is saved to the configured `DatasetPath` folder as `Name_timestamp.ext`.  
-The DeepFace embedding cache (`.pkl`) is deleted so the ML service rebuilds it on the next recognition request.  
-Set `DatasetPath` in `appsettings.json` to the same folder used by the ML service.
+The image is forwarded to the ML service's `/add-person` endpoint, which saves it to the dataset folder and invalidates the embedding cache. The ML service must be running and configured via `MlService:Url`.
 
 **Response** (`201 Created`):
 ```json

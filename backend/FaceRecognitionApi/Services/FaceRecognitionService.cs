@@ -219,9 +219,55 @@ public class FaceRecognitionService : IFaceRecognitionService
         };
     }
 
+    /// <summary>
+    /// Derives the ML service base URL (scheme + host + port) from the configured
+    /// recognize URL, e.g. "http://localhost:5001/recognize" → "http://localhost:5001".
+    /// </summary>
+    private string? GetMlServiceBaseUrl()
+    {
+        var url = _config["MlService:Url"];
+        if (string.IsNullOrWhiteSpace(url)) return null;
+        return new Uri(url).GetLeftPart(UriPartial.Authority);
+    }
+
+    /// <inheritdoc/>
+    public async Task<string?> AddPersonAsync(string name, Stream imageStream, string fileName)
+    {
+        var baseUrl = GetMlServiceBaseUrl();
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            _logger.LogWarning("ML service URL is not configured. Set 'MlService:Url' in appsettings.");
+            return null;
+        }
+
+        byte[] imageBytes;
+        using (var ms = new MemoryStream())
+        {
+            await imageStream.CopyToAsync(ms);
+            imageBytes = ms.ToArray();
+        }
+
+        using var content = new MultipartFormDataContent();
+        content.Add(new StringContent(name), "name");
+        var imageContent = new StreamContent(new MemoryStream(imageBytes));
+        imageContent.Headers.ContentType = new MediaTypeHeaderValue(GetMimeType(fileName));
+        content.Add(imageContent, "image", fileName);
+
+        var response = await _httpClient.PostAsync($"{baseUrl}/add-person", content);
+        response.EnsureSuccessStatusCode();
+
+        var doc = await response.Content.ReadFromJsonAsync<AddPersonResponse>();
+        return doc?.Filename;
+    }
+
     private class MlServiceResponse
     {
         public string Label { get; set; } = string.Empty;
         public double Confidence { get; set; }
+    }
+
+    private class AddPersonResponse
+    {
+        public string Filename { get; set; } = string.Empty;
     }
 }

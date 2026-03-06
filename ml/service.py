@@ -20,6 +20,7 @@ Po zbudowaniu bazy serwis startuje w ~30 s (wczytanie modelu + cache).
 
 import argparse
 import os
+import re
 import socket
 import sys
 import tempfile
@@ -360,6 +361,74 @@ def recognize():
                 os.unlink(tmp_path)
             except Exception:
                 pass
+
+
+@app.route("/add-person", methods=["POST"])
+def add_person():
+    """
+    Dodaje nową osobę do datasetu i usuwa cache embeddingów (.pkl).
+
+    Request:  POST multipart/form-data, pola 'name' (tekst) i 'image' (plik)
+    Response: { "filename": "Jan Kowalski_1741296000.jpg" }
+
+    Po wywołaniu tego endpointu DeepFace przebuduje bazę embeddingów
+    automatycznie przy następnym zapytaniu /recognize.
+    """
+    global _embeddings_ready
+
+    if _dataset_path is None:
+        return jsonify({"error": "Dataset path not configured. Start service with --dataset."}), 503
+
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Missing or empty 'name' field."}), 400
+
+    if "image" not in request.files:
+        return jsonify({"error": "Missing 'image' field."}), 400
+
+    file = request.files["image"]
+    if not file.filename:
+        return jsonify({"error": "Empty file."}), 400
+
+    # Sanitise the name for use in a filename (cross-platform)
+    safe_name = re.sub(r'[/\\:*?"<>|\x00]', "", name).strip()
+    if not safe_name:
+        return jsonify({"error": "Name contains only invalid characters."}), 400
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in (".jpg", ".jpeg", ".png", ".bmp"):
+        ext = ".jpg"
+
+    timestamp = int(time.time())
+    filename = f"{safe_name}_{timestamp}{ext}"
+
+    # Ensure dataset folder exists
+    Path(_dataset_path).mkdir(parents=True, exist_ok=True)
+    dest = Path(_dataset_path) / filename
+
+    # Write atomically: save to a .tmp file first, then rename
+    tmp_dest = dest.with_suffix(dest.suffix + ".tmp")
+    try:
+        file.save(str(tmp_dest))
+        tmp_dest.rename(dest)
+    except Exception as exc:
+        try:
+            tmp_dest.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return jsonify({"error": f"Could not save image: {exc}"}), 500
+
+    # Invalidate the embedding cache so DeepFace rebuilds it on the next /recognize call
+    pkl = _get_pkl_path(_dataset_path)
+    if pkl.exists():
+        try:
+            pkl.unlink()
+        except Exception as e:
+            print(f"Warning: could not delete embedding cache {pkl}: {e}")
+
+    _embeddings_ready = False
+
+    return jsonify({"filename": filename}), 201
 
 
 # ── Uruchomienie ──────────────────────────────────────────────────────────────
