@@ -78,9 +78,11 @@ Otwórz przeglądarkę: `http://localhost:5233`
 
 ---
 
-### Krok 5 – Załaduj bazę danych z CSV
+### Krok 5 – Załaduj bazę danych
 
 Otwórz `http://localhost:5233/Persons` → kliknij **Wybierz plik** → wybierz swój plik CSV z dysku → kliknij **Załaduj**.
+
+> Nie masz CSV? Użyj opcji **Skanuj dataset** (podaj ścieżkę do `ml/dataset/`) albo po prostu rozpoznaj kilka zdjęć – baza wypełni się sama. Szczegóły: sekcja „Jak działa wyszukiwanie w bazie?" poniżej.
 
 > Przykładowy plik CSV: `backend/data/sample_faces.csv`
 
@@ -134,11 +136,14 @@ dotnet run
 Zostaw to okno otwarte. Po uruchomieniu otwórz przeglądarkę:  
 → `http://localhost:5233`
 
-### Załaduj CSV (raz, po pierwszym starcie)
+### Załaduj bazę (raz, po pierwszym starcie)
 
 1. Otwórz `http://localhost:5233/Persons` w przeglądarce
 2. Kliknij **Wybierz plik** w sekcji "Załaduj bazę danych z pliku CSV" i wybierz swój plik CSV z dysku
 3. Kliknij **Załaduj** – baza zostanie wypełniona automatycznie
+
+Alternatywnie – jeśli masz zdjęcia w `ml/dataset/`, użyj `POST /api/persons/scan-dataset`  
+(przez Swagger: `http://localhost:5233/swagger`) aby załadować bazę wprost z nazw plików.
 
 > Przykładowy plik CSV z 8 rekordami: `backend/data/sample_faces.csv`
 
@@ -172,7 +177,7 @@ backend/
     │   └── CsvImportService.cs         ← importuje CSV (id,label) do bazy; parsuje nazwę z pliku
     │
     ├── Controllers/
-    │   ├── PersonsController.cs        ← REST: GET/POST/DELETE /api/persons, POST /api/persons/seed
+    │   ├── PersonsController.cs        ← REST: GET/POST/DELETE /api/persons; seed (ścieżka), seed-upload (plik), scan-dataset (folder)
     │   └── FacesController.cs          ← REST: POST /api/faces/recognize (upload zdjęcia)
     │
     ├── Pages/                          ← strona webowa (Razor Pages)
@@ -326,33 +331,112 @@ Po uruchomieniu dostępne są trzy adresy:
 
 ---
 
-## Krok 2 – Załaduj dane z CSV do bazy
+## Krok 2 – Załaduj dane do bazy osób
 
-Po uruchomieniu backendu wgraj dane z pliku CSV (przygotowany przykład w `backend/data/sample_faces.csv`):
+> **TL;DR – najprostszy sposób:** otwórz `http://localhost:5233/Persons`, kliknij **Wybierz plik**, wybierz CSV → **Załaduj**.  
+> Alternatywnie – jeśli masz zdjęcia w `ml/dataset/`, użyj **Skanuj dataset** (patrz niżej) – baza wypełni się automatycznie z plików w folderze.  
+> Jeśli nie zrobisz nic, baza i tak wypełni się sama przy pierwszym rozpoznaniu (patrz „Jak działa wyszukiwanie?" niżej).
 
-**Przez Swagger UI** – otwórz `http://localhost:5233/swagger`, znajdź `POST /api/persons/seed`, kliknij "Try it out" i wklej:
+### Sposób A – Upload CSV przez stronę webową (najłatwiejszy)
 
-```json
-{
-  "csvFilePath": "C:\\ścieżka\\do\\pliku\\faces.csv"
-}
+1. Otwórz `http://localhost:5233/Persons`  
+2. Kliknij **Wybierz plik** w sekcji „Załaduj bazę danych z pliku CSV"  
+3. Wybierz plik CSV z dysku → kliknij **Załaduj**
+
+> Przykładowy plik CSV (8 rekordów): `backend/data/sample_faces.csv`
+
+Format CSV (kolumny `id` i `label`):
+```
+id,label
+1,Robert Downey Jr_87.jpg
+2,Scarlett Johansson_12.jpg
 ```
 
-**Lub przez curl** (Linux/macOS/PowerShell):
+### Sposób B – Skanuj folder `ml/dataset/` (bez CSV)
 
+Jeśli masz już zdjęcia w `ml/dataset/`, możesz wczytać bazę bezpośrednio z nazw plików – bez przygotowywania CSV.
+
+**Przez Swagger UI** (`http://localhost:5233/swagger`) → `POST /api/persons/scan-dataset`:
+```json
+{ "datasetPath": "C:\\ścieżka\\do\\ml\\dataset" }
+```
+
+**Przez curl:**
+```bash
+curl -X POST http://localhost:5233/api/persons/scan-dataset \
+     -H "Content-Type: application/json" \
+     -d "{\"datasetPath\": \"/bezwzgledna/sciezka/do/ml/dataset\"}"
+```
+
+Backend odczyta nazwy plików (np. `Akshay Kumar_87.jpg`) i wpisze je do bazy jako osoby.
+
+### Sposób C – Podaj ścieżkę do CSV na serwerze
+
+**Przez Swagger UI** → `POST /api/persons/seed`:
+```json
+{ "csvFilePath": "C:\\ścieżka\\do\\faces.csv" }
+```
+
+**Przez curl:**
 ```bash
 curl -X POST http://localhost:5233/api/persons/seed \
      -H "Content-Type: application/json" \
      -d "{\"csvFilePath\": \"/bezwzgledna/sciezka/do/faces.csv\"}"
 ```
 
-Format CSV (kolumny `id` i `label`):
+---
+
+## Jak działa wyszukiwanie w bazie?
+
+### Pełny przepływ rozpoznawania twarzy
 
 ```
-id,label
-1,Robert Downey Jr_87.jpg
-2,Scarlett Johansson_12.jpg
+Twoje zdjęcie
+     │
+     ▼
+POST /api/faces/recognize         ← backend ASP.NET
+     │
+     ├─► Python ML serwis         ← DeepFace porównuje twarz ze zdjęciami w dataset/
+     │       │
+     │       └─► zwraca: { "label": "Akshay Kumar_87.jpg", "confidence": 0.94 }
+     │
+     ├─► Wyciągnij nazwę z etykiety:
+     │       "Akshay Kumar_87.jpg"  →  "Akshay Kumar"
+     │
+     ├─► Wyszukaj w bazie SQLite:
+     │       WHERE ImageFileName = 'Akshay Kumar_87.jpg'
+     │          OR Name          = 'Akshay Kumar'
+     │
+     ├─► [Znaleziono] → zwróć Found=true + dane osoby
+     │
+     └─► [Nie znaleziono] → auto-wstaw rekord do bazy → zwróć Found=true
+                           (baza rośnie sama przy każdym nowym rozpoznaniu)
 ```
+
+### Skąd backend wie, czyjej twarzy szuka?
+
+Backend **nie wykonuje sam rozpoznawania** – deleguje to do serwisu Python (DeepFace).  
+DeepFace porównuje przesłane zdjęcie ze wszystkimi plikami w folderze `ml/dataset/`  
+i zwraca nazwę najbardziej podobnego pliku (np. `Akshay Kumar_87.jpg`).
+
+Backend wyciąga wtedy imię i nazwisko z nazwy pliku (usuwa sufiks `_87` i rozszerzenie)  
+i szuka tego rekordu w tabeli `Persons` w SQLite.
+
+### Dlaczego baza czasem jest pusta?
+
+Baza `Persons` w SQLite jest **oddzielna** od folderu `ml/dataset/`.  
+Możesz mieć setki zdjęć w datasecie, ale pustą bazę w SQLite – i odwrotnie.
+
+**Jak to naprawić:**
+- **Automatycznie** – wystarczy rozpoznać kilka zdjęć; backend wstawia do bazy każdą rozpoznaną osobę, której tam jeszcze nie ma.  
+- **Jednorazowo** – użyj `POST /api/persons/scan-dataset` (Sposób B powyżej) aby wczytać cały dataset naraz.
+
+### Po co dwa nowe endpointy?
+
+| Endpoint | Problem, który rozwiązuje |
+|---|---|
+| `POST /api/persons/seed-upload` | Wcześniej do załadowania CSV trzeba było podać **bezwzględną ścieżkę pliku na serwerze** (`/api/persons/seed`) – trudne jeśli serwer i klient są na innych maszynach. Teraz można **przesłać plik bezpośrednio** z przeglądarki lub curl. |
+| `POST /api/persons/scan-dataset` | Eliminuje potrzebę posiadania pliku CSV w ogóle – jeśli masz zdjęcia w `ml/dataset/`, baza wczyta się **wprost z nazw plików**. Szczególnie przydatne po pobraniu datasetu z Kaggle. |
 
 ---
 
