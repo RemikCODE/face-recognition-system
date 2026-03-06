@@ -119,7 +119,7 @@ public class PersonsController : ControllerBase
         var imageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             { ".jpg", ".jpeg", ".png", ".bmp" };
 
-        var files = Directory.EnumerateFiles(request.DatasetPath, "*", SearchOption.TopDirectoryOnly)
+        var files = Directory.EnumerateFiles(request.DatasetPath, "*", SearchOption.AllDirectories)
             .Where(f => imageExtensions.Contains(Path.GetExtension(f)))
             .OrderBy(f => f)
             .ToList();

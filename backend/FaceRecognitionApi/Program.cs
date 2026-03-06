@@ -54,22 +54,51 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Apply migrations, ensure database is created, and auto-seed from bundled CSV
+// Apply migrations, ensure database is created, and auto-seed persons from the dataset folder
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
 
-    // Auto-seed the Persons table from the bundled faces.csv if the table is empty
     if (!db.Persons.Any())
     {
-        var csvPath = Path.Combine(AppContext.BaseDirectory, "Data", "faces.csv");
-        if (File.Exists(csvPath))
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+        // Auto-seed from the ML dataset folder when configured
+        var datasetPath = builder.Configuration["DatasetPath"];
+        if (!string.IsNullOrWhiteSpace(datasetPath) && Directory.Exists(datasetPath))
         {
-            var csvImport = scope.ServiceProvider.GetRequiredService<CsvImportService>();
-            var count = await csvImport.ImportAsync(csvPath);
-            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("Auto-seeded {Count} persons from bundled faces.csv", count);
+            var imageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                { ".jpg", ".jpeg", ".png", ".bmp" };
+
+            var files = Directory.EnumerateFiles(datasetPath, "*", SearchOption.AllDirectories)
+                .Where(f => imageExtensions.Contains(Path.GetExtension(f)))
+                .OrderBy(f => f)
+                .ToList();
+
+            if (files.Count > 0)
+            {
+                var records = files.Select(f => new FaceRecognitionApi.Models.Person
+                {
+                    Name = FaceRecognitionApi.Services.CsvImportService.ExtractName(Path.GetFileName(f)),
+                    ImageFileName = Path.GetFileName(f),
+                }).ToList();
+
+                db.Persons.AddRange(records);
+                await db.SaveChangesAsync();
+                logger.LogInformation("Auto-seeded {Count} persons from dataset folder: {Path}", records.Count, datasetPath);
+            }
+        }
+        else
+        {
+            // Fall back to bundled CSV if present
+            var csvPath = Path.Combine(AppContext.BaseDirectory, "Data", "faces.csv");
+            if (File.Exists(csvPath))
+            {
+                var csvImport = scope.ServiceProvider.GetRequiredService<CsvImportService>();
+                var count = await csvImport.ImportAsync(csvPath);
+                logger.LogInformation("Auto-seeded {Count} persons from bundled faces.csv", count);
+            }
         }
     }
 }
