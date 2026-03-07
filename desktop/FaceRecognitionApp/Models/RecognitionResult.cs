@@ -1,5 +1,3 @@
-using FaceRecognitionApp.Models;
-
 namespace FaceRecognitionApp.Models;
 
 public class RecognitionResult
